@@ -1,0 +1,13 @@
+# Solo el backend. La base de datos es Supabase (Postgres gestionado
+# externo) — no se declara aquí ningún servicio ni volumen de Postgres.
+services:
+  bakend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: auditorias-industriales/bakend:latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped

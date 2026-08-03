@@ -1,0 +1,8 @@
+logging:
+  level:
+    root: INFO
+    com.auditoriaindustriales.bakend: INFO
+
+springdoc:
+  swagger-ui:
+    enabled: false
