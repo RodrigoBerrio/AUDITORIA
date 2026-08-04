@@ -5,7 +5,7 @@
 // por un único store predecible con Zustand.
 // ============================================================
 import { create } from 'zustand';
-import type { Usuario, ValorEscala } from '../types/domain';
+import type { EvidenciaFotografica, Usuario, ValorEscala } from '../types/domain';
 
 export type RolSesion = 'auditor' | 'cliente';
 
@@ -43,11 +43,15 @@ interface AppState {
 
   // Auditoría en curso (sesión de trabajo del auditor)
   empresaActivaId: string | null;
+  auditoriaActivaId: string | null;
   cuestionarioActivoId: string | null;
   respuestas: Record<string, RespuestaSesion>;
+  evidenciasPorPregunta: Record<string, EvidenciaFotografica[]>;
   setEmpresaActiva: (empresaId: string) => void;
+  setAuditoriaActiva: (auditoriaId: string | null) => void;
   setCuestionarioActivo: (cuestionarioId: string) => void;
   responder: (preguntaId: string, valor: ValorEscala, observacion?: string) => void;
+  agregarEvidencia: (preguntaId: string, evidencia: EvidenciaFotografica) => void;
   reiniciarSesionAuditoria: () => void;
 
   // Toast
@@ -75,9 +79,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   logout: () => set({ rol: null, autenticado: false, usuario: null, accessToken: null, refreshToken: null }),
 
   empresaActivaId: null,
+  auditoriaActivaId: null,
   cuestionarioActivoId: null,
   respuestas: {},
+  evidenciasPorPregunta: {},
   setEmpresaActiva: (empresaId) => set({ empresaActivaId: empresaId }),
+  setAuditoriaActiva: (auditoriaId) => set({ auditoriaActivaId: auditoriaId }),
   setCuestionarioActivo: (cuestionarioId) => set({ cuestionarioActivoId: cuestionarioId }),
   responder: (preguntaId, valor, observacion) =>
     set((state) => ({
@@ -86,7 +93,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         [preguntaId]: { valor, observacion: observacion ?? state.respuestas[preguntaId]?.observacion },
       },
     })),
-  reiniciarSesionAuditoria: () => set({ respuestas: {}, cuestionarioActivoId: null }),
+  agregarEvidencia: (preguntaId, evidencia) =>
+    set((state) => ({
+      evidenciasPorPregunta: {
+        ...state.evidenciasPorPregunta,
+        [preguntaId]: [...(state.evidenciasPorPregunta[preguntaId] ?? []), evidencia],
+      },
+    })),
+  reiniciarSesionAuditoria: () => set({ respuestas: {}, cuestionarioActivoId: null, evidenciasPorPregunta: {}, auditoriaActivaId: null }),
 
   toast: { visible: false, mensaje: '', tipo: 'ok' },
   mostrarToast: (mensaje, tipo = 'ok') => {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { api, ApiError } from '../../api/client';
-import type { Empresa } from '../../types/domain';
+import type { Auditoria, Empresa } from '../../types/domain';
 
 interface FormEmpresa {
   razonSocial: string; nit: string; sector: string; numEmpleados: string;
@@ -16,11 +16,12 @@ const EMPTY_FORM: FormEmpresa = {
 
 export function EmpresasPage() {
   const navigate = useNavigate();
-  const { mostrarToast, pedirConfirmacion, setEmpresaActiva, accessToken } = useAppStore();
+  const { mostrarToast, pedirConfirmacion, setEmpresaActiva, setAuditoriaActiva, accessToken } = useAppStore();
   const [form, setForm] = useState<FormEmpresa>(EMPTY_FORM);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [creandoAuditoriaId, setCreandoAuditoriaId] = useState<string | null>(null);
 
   const cargarEmpresas = () => {
     setCargando(true);
@@ -71,6 +72,20 @@ export function EmpresasPage() {
     pedirConfirmacion('¿Descartar cambios?', 'Se perderá la información ingresada.', 'Descartar', () => setForm(EMPTY_FORM));
   };
 
+  const iniciarAuditoria = async (empresaId: string) => {
+    setCreandoAuditoriaId(empresaId);
+    try {
+      const auditoria = await api.post<Auditoria>('/api/auditorias', { empresaId }, accessToken);
+      setEmpresaActiva(empresaId);
+      setAuditoriaActiva(auditoria.id);
+      navigate('/auditor/formulario');
+    } catch (err) {
+      mostrarToast(err instanceof ApiError ? err.message : 'No se pudo iniciar la auditoría', 'warn');
+    } finally {
+      setCreandoAuditoriaId(null);
+    }
+  };
+
   return (
     <div>
       <div className="card">
@@ -85,7 +100,7 @@ export function EmpresasPage() {
         <div className="g2">
           <div className="fg">
             <label className="lbl">Razón social <span className="req">*</span></label>
-            <input className="inp" placeholder="Ej: Industrias Palma SAS" value={form.razonSocial} onChange={(e) => set('razonSocial', e.target.value)} />
+            <input className="inp" placeholder="Nombre de la empresa" value={form.razonSocial} onChange={(e) => set('razonSocial', e.target.value)} />
           </div>
           <div className="fg">
             <label className="lbl">NIT <span className="req">*</span></label>
@@ -179,8 +194,8 @@ export function EmpresasPage() {
                   <td>
                     <div className="t-actions">
                       <button className="btn btn-sm"><i className="ti ti-eye" /> Ver</button>
-                      <button className="btn btn-primary btn-sm" onClick={() => { setEmpresaActiva(e.id); navigate('/auditor/formulario'); }}>
-                        <i className="ti ti-plus" /> Nueva auditoría
+                      <button className="btn btn-primary btn-sm" onClick={() => iniciarAuditoria(e.id)} disabled={creandoAuditoriaId === e.id}>
+                        <i className="ti ti-plus" /> {creandoAuditoriaId === e.id ? 'Creando…' : 'Nueva auditoría'}
                       </button>
                     </div>
                   </td>

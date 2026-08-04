@@ -19,7 +19,7 @@ export function AuditoriaFormPage() {
   const { empresaActivaId, cuestionarioActivoId, setCuestionarioActivo, respuestas, responder, mostrarToast, pedirConfirmacion } = useAppStore();
 
   const empresaActiva = empresas.find((e) => e.id === empresaActivaId) ?? empresas[0];
-  const [categoriaId, setCategoriaId] = useState(categorias[0].id);
+  const [categoriaId, setCategoriaId] = useState(categorias[0]?.id ?? '');
 
   const subcatsDeCategoria = useMemo(
     () => subcategorias.filter((s) => s.categoriaId === categoriaId),
@@ -58,6 +58,19 @@ export function AuditoriaFormPage() {
       () => navigate('/auditor/reportes'),
     );
   };
+
+  if (categorias.length === 0) {
+    return (
+      <div className="card empty">
+        <i className="ti ti-folder-off" />
+        <div className="empty-t">Aún no hay categorías cargadas</div>
+        <div className="empty-s">Crea una categoría, subcategoría y cuestionario para empezar a auditar.</div>
+        <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => navigate('/auditor/categorias')}>
+          <i className="ti ti-plus" /> Ir a categorías
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -130,10 +143,11 @@ export function AuditoriaFormPage() {
       ) : (
         <div className="card">
           <div className="card-hd"><div className="card-title">{cuestionarioActivo?.nombre}</div></div>
-          {preguntas.map((p) => (
+          {preguntas.map((p, i) => (
             <QuestionCard
               key={p.id}
               pregunta={p}
+              numero={i + 1}
               totalPreguntas={preguntas.length}
               valor={respuestas[p.id]?.valor as ValorEscala | undefined}
               observacion={respuestas[p.id]?.observacion}

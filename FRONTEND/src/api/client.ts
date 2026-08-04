@@ -13,9 +13,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit, token?: string | null): Promise<T> {
+async function request<T>(path: string, options: RequestInit, token?: string | null, isMultipart = false): Promise<T> {
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    // El boundary del multipart lo fija el navegador; fijar Content-Type a mano lo rompe.
+    ...(isMultipart ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
@@ -43,4 +44,6 @@ export const api = {
   put: <T>(path: string, body: unknown, token?: string | null) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }, token),
   delete: <T>(path: string, token?: string | null) => request<T>(path, { method: 'DELETE' }, token),
+  postMultipart: <T>(path: string, formData: FormData, token?: string | null) =>
+    request<T>(path, { method: 'POST', body: formData }, token, true),
 };

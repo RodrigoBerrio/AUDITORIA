@@ -1,13 +1,8 @@
 import { empresas, auditorias, reportes, hallazgos, cuestionarios, preguntasPorCuestionario } from '../../data/mockData';
 import { useAppStore, useProgresoCuestionario } from '../../store/useAppStore';
 
-const HISTORICO = [
-  { nombre: 'Generación\ny control', puntaje: 3.8, color: 'var(--brand-mid)' },
-  { nombre: 'Indicadores\ndesempeño', puntaje: 2.1, color: '#E67E22' },
-  { nombre: 'Costos de\nmantenimiento', puntaje: 4.2, color: '#27AE60' },
-  { nombre: 'Flujo\nde caja', puntaje: 1.9, color: '#C0392B' },
-  { nombre: 'Gestión\ncomercial', puntaje: 3.4, color: 'var(--brand)' },
-];
+// Se llena con el histórico real de puntajes por cuestionario a medida que se completan auditorías.
+const HISTORICO: { nombre: string; puntaje: number; color: string }[] = [];
 
 const SEVERIDAD_COLOR: Record<string, string> = { critica: '#C0392B', alta: '#C0392B', media: '#D4860A', baja: '#27AE60' };
 
@@ -31,7 +26,7 @@ export function ReportesPage() {
           <div className="card-hd">
             <div>
               <div className="card-title">Puntaje promedio por cuestionario</div>
-              <div className="card-sub">{empresas[0].razonSocial} — sesión actual</div>
+              <div className="card-sub">{empresas[0]?.razonSocial ?? 'Sin empresa activa'} — sesión actual</div>
             </div>
             {enVivo && <span className="badge b-info"><i className="ti ti-live-view" style={{ fontSize: 11 }} /> En vivo</span>}
           </div>
@@ -50,22 +45,26 @@ export function ReportesPage() {
             </div>
           )}
 
-          <div className="bar-chart">
-            {HISTORICO.map((b) => (
-              <div className="bar-col" key={b.nombre}>
-                <div className="bar-v">{b.puntaje}</div>
-                <div className="bar-fill" style={{ height: `${(b.puntaje / 5) * 100}px`, background: b.color }} />
-                <div className="bar-nm" style={{ whiteSpace: 'pre-line' }}>{b.nombre}</div>
-              </div>
-            ))}
-            {enVivo && (
-              <div className="bar-col">
-                <div className="bar-v">{progreso.promedio}</div>
-                <div className="bar-fill" style={{ height: `${(progreso.promedio! / 5) * 100}px`, background: '#27AE60' }} />
-                <div className="bar-nm">Sesión<br />actual</div>
-              </div>
-            )}
-          </div>
+          {HISTORICO.length === 0 && !enVivo ? (
+            <p className="hint">Aún no hay puntajes registrados.</p>
+          ) : (
+            <div className="bar-chart">
+              {HISTORICO.map((b) => (
+                <div className="bar-col" key={b.nombre}>
+                  <div className="bar-v">{b.puntaje}</div>
+                  <div className="bar-fill" style={{ height: `${(b.puntaje / 5) * 100}px`, background: b.color }} />
+                  <div className="bar-nm" style={{ whiteSpace: 'pre-line' }}>{b.nombre}</div>
+                </div>
+              ))}
+              {enVivo && (
+                <div className="bar-col">
+                  <div className="bar-v">{progreso.promedio}</div>
+                  <div className="bar-fill" style={{ height: `${(progreso.promedio! / 5) * 100}px`, background: '#27AE60' }} />
+                  <div className="bar-nm">Sesión<br />actual</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="card" style={{ marginBottom: 0 }}>
@@ -78,9 +77,13 @@ export function ReportesPage() {
           <div className="donut-wrap">
             <svg width="110" height="110" viewBox="0 0 110 110" aria-hidden="true">
               <circle cx="55" cy="55" r="40" fill="none" stroke="#EEF1F5" strokeWidth="18" />
-              <circle cx="55" cy="55" r="40" fill="none" stroke="#C0392B" strokeWidth="18" strokeDasharray="75 176" strokeDashoffset="-62" transform="rotate(-90 55 55)" />
-              <circle cx="55" cy="55" r="40" fill="none" stroke="#D4860A" strokeWidth="18" strokeDasharray="100 151" strokeDashoffset="-137" transform="rotate(-90 55 55)" />
-              <circle cx="55" cy="55" r="40" fill="none" stroke="#27AE60" strokeWidth="18" strokeDasharray="76 175" strokeDashoffset="-237" transform="rotate(-90 55 55)" />
+              {hallazgos.length > 0 && (
+                <>
+                  <circle cx="55" cy="55" r="40" fill="none" stroke="#C0392B" strokeWidth="18" strokeDasharray="75 176" strokeDashoffset="-62" transform="rotate(-90 55 55)" />
+                  <circle cx="55" cy="55" r="40" fill="none" stroke="#D4860A" strokeWidth="18" strokeDasharray="100 151" strokeDashoffset="-137" transform="rotate(-90 55 55)" />
+                  <circle cx="55" cy="55" r="40" fill="none" stroke="#27AE60" strokeWidth="18" strokeDasharray="76 175" strokeDashoffset="-237" transform="rotate(-90 55 55)" />
+                </>
+              )}
               <text x="55" y="50" textAnchor="middle" fontSize="20" fontWeight="600" fill="#1A202C">{hallazgos.length}</text>
               <text x="55" y="65" textAnchor="middle" fontSize="10" fill="#8896A8">hallazgos</text>
             </svg>
@@ -122,6 +125,9 @@ export function ReportesPage() {
           <table className="tbl">
             <thead><tr><th>Empresa</th><th>Fecha</th><th>Puntaje</th><th>Hallazgos</th><th>Estado</th><th /></tr></thead>
             <tbody>
+              {reportes.length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-3)' }}>Todavía no hay reportes generados.</td></tr>
+              )}
               {reportes.map((r) => {
                 const auditoria = auditorias.find((a) => a.id === r.auditoriaId);
                 const empresa = auditoria ? empresaPorId[auditoria.empresaId] : undefined;

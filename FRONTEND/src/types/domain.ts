@@ -124,6 +124,18 @@ export interface Hallazgo {
   area?: string;
 }
 
+export interface EvidenciaFotografica {
+  id: string;
+  auditoriaId: string;
+  respuestaId?: string;
+  urlArchivo: string;
+  descripcion?: string;
+  subidaPor: string;
+  clienteUuid: string;
+  tomadaEn?: string;
+  subidaEn: string;
+}
+
 /** Escala de madurez 1-5 con su etiqueta y descripción, tal como en el prototipo. */
 export const ESCALA_MADUREZ: { valor: ValorEscala; etiqueta: string; descripcion: string }[] = [
   { valor: 1, etiqueta: 'De Falla', descripcion: 'No existe una estrategia claramente definida y documentada.' },

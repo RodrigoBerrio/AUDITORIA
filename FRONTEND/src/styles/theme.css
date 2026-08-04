@@ -333,6 +333,16 @@ textarea.inp { resize:vertical; min-height:72px; }
   color:var(--text-1); background:var(--surface-2); }
 .q-obs input:focus { outline:none; border-color:var(--brand-mid); border-style:solid; }
 
+.q-foto { margin-top:10px; }
+.q-foto-thumbs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+.q-foto-thumb {
+  display:block; width:56px; height:56px; border-radius:var(--r-sm);
+  overflow:hidden; border:1px solid var(--border);
+}
+.q-foto-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.q-foto .ti-loader-2 { animation:spin .8s linear infinite; }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
 .scale-opts { display:flex; gap:6px; }
 .scale-opt {
   flex:1; padding:6px 4px; text-align:center;
