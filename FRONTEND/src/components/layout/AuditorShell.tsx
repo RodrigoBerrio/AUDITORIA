@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { usuarioActual } from '../../data/mockData';
@@ -18,6 +19,7 @@ const NAV_AUDITORIA = [
 export function AuditorShell() {
   const navigate = useNavigate();
   const { logout, pedirConfirmacion } = useAppStore();
+  const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
   const cerrarSesion = () => {
     pedirConfirmacion('¿Cerrar sesión?', 'Volverás a la página principal.', 'Cerrar sesión', () => {
@@ -30,7 +32,8 @@ export function AuditorShell() {
 
   return (
     <div className="shell">
-      <aside className="sidebar" role="navigation" aria-label="Menú principal">
+      {sidebarAbierto && <div className="sidebar-backdrop" onClick={() => setSidebarAbierto(false)} />}
+      <aside className={`sidebar${sidebarAbierto ? ' open' : ''}`} role="navigation" aria-label="Menú principal">
         <div className="sidebar-logo">
           <div className="logo-icon"><i className="ti ti-clipboard-check" /></div>
           <div>
@@ -42,7 +45,7 @@ export function AuditorShell() {
         <div className="sidebar-section">
           <div className="sidebar-label">Principal</div>
           {NAV_PRINCIPAL.map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+            <NavLink key={item.to} to={item.to} onClick={() => setSidebarAbierto(false)} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
               <i className={`ti ${item.icon}`} /> {item.label}
             </NavLink>
           ))}
@@ -51,7 +54,7 @@ export function AuditorShell() {
         <div className="sidebar-section">
           <div className="sidebar-label">Auditoría</div>
           {NAV_AUDITORIA.map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+            <NavLink key={item.to} to={item.to} onClick={() => setSidebarAbierto(false)} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
               <i className={`ti ${item.icon}`} /> {item.label}
             </NavLink>
           ))}
@@ -72,8 +75,11 @@ export function AuditorShell() {
       <div className="main">
         <header className="topbar">
           <div className="topbar-left">
+            <button className="sidebar-toggle" aria-label="Abrir menú" onClick={() => setSidebarAbierto(true)}>
+              <i className="ti ti-menu-2" />
+            </button>
             <button className="btn btn-sm" onClick={() => navigate('/')}>
-              <i className="ti ti-arrow-left" /> Volver al inicio
+              <i className="ti ti-arrow-left" /> <span className="btn-label">Volver al inicio</span>
             </button>
           </div>
           <div className="topbar-right">
@@ -84,10 +90,10 @@ export function AuditorShell() {
               <div className="notif" />
             </div>
             <button className="btn btn-sm" onClick={() => navigate('/auditor/empresas')}>
-              <i className="ti ti-plus" /> Nueva empresa
+              <i className="ti ti-plus" /> <span className="btn-label">Nueva empresa</span>
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => navigate('/auditor/formulario')}>
-              <i className="ti ti-player-play" /> Iniciar auditoría
+              <i className="ti ti-player-play" /> <span className="btn-label">Iniciar auditoría</span>
             </button>
           </div>
         </header>
