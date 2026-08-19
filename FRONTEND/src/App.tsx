@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/auditor/DashboardPage';
 import { EmpresasPage } from './pages/auditor/EmpresasPage';
 import { CategoriasPage } from './pages/auditor/CategoriasPage';
 import { AuditoriaFormPage } from './pages/auditor/AuditoriaFormPage';
+import { AuditoriaResultadosPage } from './pages/auditor/AuditoriaResultadosPage';
 import { ReportesPage } from './pages/auditor/ReportesPage';
 import { ClienteDashboardPage } from './pages/cliente/ClienteDashboardPage';
 import { ClienteReportesPage } from './pages/cliente/ClienteReportesPage';
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="empresas" element={<EmpresasPage />} />
         <Route path="categorias" element={<CategoriasPage />} />
         <Route path="formulario" element={<AuditoriaFormPage />} />
+        <Route path="auditorias/:id/resultados" element={<AuditoriaResultadosPage />} />
         <Route path="reportes" element={<ReportesPage />} />
       </Route>
 

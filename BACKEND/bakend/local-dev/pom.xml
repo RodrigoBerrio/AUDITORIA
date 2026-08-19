@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Solo para resolver el classpath de LocalPostgres.java/FakeStorage.java
+  (io.zonky.test:embedded-postgres + driver JDBC de Postgres). No es un
+  módulo del build real del proyecto — ver README.md de esta carpeta.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>local</groupId>
+  <artifactId>local-dev</artifactId>
+  <version>1.0</version>
+  <properties>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>io.zonky.test</groupId>
+      <artifactId>embedded-postgres</artifactId>
+      <version>2.0.7</version>
+    </dependency>
+  </dependencies>
+</project>

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { categorias as categoriasIniciales, subcategorias as subcategoriasIniciales } from '../../data/mockData';
+import { api, ApiError } from '../../api/client';
 import type { Categoria, Subcategoria } from '../../types/domain';
 import { CategoryTree } from '../../components/ui/CategoryTree';
 import { useAppStore } from '../../store/useAppStore';
@@ -8,18 +8,20 @@ import { useAppStore } from '../../store/useAppStore';
 type NodoSeleccionado = { tipo: 'categoria' | 'subcategoria'; id: string; categoriaId?: string } | null;
 
 /**
- * Gestión de categorías/subcategorías.
- * Sustituye renderTree(), addNewSubcatRow(), saveNewCategory() (creación
- * manual de nodos DOM + arrays sincronizados a mano) por estado de React:
- * las listas de categorías/subcategorías viven en useState y el árbol
- * se re-renderiza solo cuando cambian.
+ * Gestión de categorías/subcategorías — conectada a la API real
+ * (catalogo/CategoriaController, SubcategoriaController). Las
+ * subcategorías se cargan por categoría (GET /api/categorias/:id/subcategorias)
+ * porque así está modelado el endpoint; se piden todas al cargar la página
+ * para armar el árbol completo de una vez.
  */
 export function CategoriasPage() {
   const navigate = useNavigate();
-  const { mostrarToast } = useAppStore();
+  const { mostrarToast, accessToken } = useAppStore();
 
-  const [categorias, setCategorias] = useState<Categoria[]>(categoriasIniciales);
-  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>(subcategoriasIniciales);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [subcategoriasPorCategoria, setSubcategoriasPorCategoria] = useState<Record<string, Subcategoria[]>>({});
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
   const [seleccionado, setSeleccionado] = useState<NodoSeleccionado>(null);
 
   // Wizard "nueva categoría"
@@ -34,17 +36,30 @@ export function CategoriasPage() {
   const [esPlantilla, setEsPlantilla] = useState(true);
   const [responsable, setResponsable] = useState('');
 
-  const subcategoriasPorCategoria = useMemo(() => {
-    const map: Record<string, Subcategoria[]> = {};
-    for (const s of subcategorias) {
-      (map[s.categoriaId] ??= []).push(s);
+  const cargarCatalogo = async () => {
+    setCargando(true);
+    try {
+      const cats = await api.get<Categoria[]>('/api/categorias', accessToken);
+      setCategorias(cats);
+      const entradas = await Promise.all(
+        cats.map(async (c) => [c.id, await api.get<Subcategoria[]>(`/api/categorias/${c.id}/subcategorias`, accessToken)] as const),
+      );
+      setSubcategoriasPorCategoria(Object.fromEntries(entradas));
+    } catch {
+      mostrarToast('No se pudo cargar el catálogo de categorías', 'warn');
+    } finally {
+      setCargando(false);
     }
-    return map;
-  }, [subcategorias]);
+  };
+
+  useEffect(() => { cargarCatalogo(); }, [accessToken]);
 
   const categoriaSeleccionadaId =
     seleccionado?.tipo === 'categoria' ? seleccionado.id : seleccionado?.categoriaId;
-  const categoriaActual = categorias.find((c) => c.id === categoriaSeleccionadaId) ?? null;
+  const categoriaActual = useMemo(
+    () => categorias.find((c) => c.id === categoriaSeleccionadaId) ?? null,
+    [categorias, categoriaSeleccionadaId],
+  );
   const subcatsDeCategoriaActual = categoriaActual ? subcategoriasPorCategoria[categoriaActual.id] ?? [] : [];
 
   const handleSeleccionar = (nodo: NodoSeleccionado) => {
@@ -57,10 +72,15 @@ export function CategoriasPage() {
     }
   };
 
-  const agregarCategoriaDesdeArbol = (nombre: string) => {
-    const id = 'cat_' + nombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
-    setCategorias((prev) => [...prev, { id, nombre, esPlantilla: true, activo: true }]);
-    mostrarToast('Categoría creada correctamente', 'ok');
+  const agregarCategoriaDesdeArbol = async (nombre: string) => {
+    try {
+      const creada = await api.post<Categoria>('/api/categorias', { nombre, esPlantilla: true }, accessToken);
+      setCategorias((prev) => [...prev, creada]);
+      setSubcategoriasPorCategoria((prev) => ({ ...prev, [creada.id]: [] }));
+      mostrarToast('Categoría creada correctamente', 'ok');
+    } catch (err) {
+      mostrarToast(err instanceof ApiError ? err.message : 'No se pudo crear la categoría', 'warn');
+    }
   };
 
   const agregarFilaSubcat = () => setNuevasSubcats((prev) => [...prev, '']);
@@ -68,28 +88,35 @@ export function CategoriasPage() {
     setNuevasSubcats((prev) => prev.map((v, i) => (i === idx ? valor : v)));
   const quitarFilaSubcat = (idx: number) => setNuevasSubcats((prev) => prev.filter((_, i) => i !== idx));
 
-  const crearNuevaCategoriaCompleta = () => {
+  const crearNuevaCategoriaCompleta = async () => {
     if (!nuevaCatNombre.trim()) return;
     const nombresValidos = nuevasSubcats.map((s) => s.trim()).filter(Boolean);
     if (nombresValidos.length === 0) {
       mostrarToast('Agrega al menos una subcategoría', 'warn');
       return;
     }
-    const catId = 'cat_' + nuevaCatNombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
-    const nuevaCategoria: Categoria = { id: catId, nombre: nuevaCatNombre.trim(), esPlantilla: true, activo: true };
-    const nuevasSub: Subcategoria[] = nombresValidos.map((nombre, i) => ({
-      id: `${catId}_sub_${i}`, categoriaId: catId, nombre, esPlantilla: true, activo: true,
-    }));
-    setCategorias((prev) => [...prev, nuevaCategoria]);
-    setSubcategorias((prev) => [...prev, ...nuevasSub]);
-    setSeleccionado({ tipo: 'categoria', id: catId });
-    setMostrarWizardCat(false);
-    setNuevaCatNombre('');
-    setNuevasSubcats(['']);
-    mostrarToast('Categoría y subcategorías creadas', 'ok');
+    setGuardando(true);
+    try {
+      const nuevaCategoria = await api.post<Categoria>('/api/categorias', { nombre: nuevaCatNombre.trim(), esPlantilla: true }, accessToken);
+      const nuevasSub = await Promise.all(
+        nombresValidos.map((nombre) =>
+          api.post<Subcategoria>(`/api/categorias/${nuevaCategoria.id}/subcategorias`, { nombre, esPlantilla: true }, accessToken)),
+      );
+      setCategorias((prev) => [...prev, nuevaCategoria]);
+      setSubcategoriasPorCategoria((prev) => ({ ...prev, [nuevaCategoria.id]: nuevasSub }));
+      setSeleccionado({ tipo: 'categoria', id: nuevaCategoria.id });
+      setMostrarWizardCat(false);
+      setNuevaCatNombre('');
+      setNuevasSubcats(['']);
+      mostrarToast('Categoría y subcategorías creadas', 'ok');
+    } catch (err) {
+      mostrarToast(err instanceof ApiError ? err.message : 'No se pudo crear la categoría', 'warn');
+    } finally {
+      setGuardando(false);
+    }
   };
 
-  const guardarSubcategoria = (irAlFormulario: boolean) => {
+  const guardarSubcategoria = async (irAlFormulario: boolean) => {
     if (!categoriaActual) {
       mostrarToast('Selecciona primero una categoría', 'warn');
       return;
@@ -99,16 +126,33 @@ export function CategoriasPage() {
         mostrarToast('Escribe el nombre de la subcategoría', 'warn');
         return;
       }
-      const id = `${categoriaActual.id}_sub_${Date.now()}`;
-      setSubcategorias((prev) => [...prev, {
-        id, categoriaId: categoriaActual.id, nombre: nuevaSubcatNombre.trim(),
-        descripcion: descripcionArea, esPlantilla, responsable, activo: true,
-      }]);
-      setNuevaSubcatNombre('');
+      setGuardando(true);
+      try {
+        const creada = await api.post<Subcategoria>(`/api/categorias/${categoriaActual.id}/subcategorias`, {
+          nombre: nuevaSubcatNombre.trim(),
+          descripcion: descripcionArea || undefined,
+          esPlantilla,
+          responsable: responsable || undefined,
+        }, accessToken);
+        setSubcategoriasPorCategoria((prev) => ({
+          ...prev,
+          [categoriaActual.id]: [...(prev[categoriaActual.id] ?? []), creada],
+        }));
+        setNuevaSubcatNombre('');
+      } catch (err) {
+        mostrarToast(err instanceof ApiError ? err.message : 'No se pudo guardar la subcategoría', 'warn');
+        setGuardando(false);
+        return;
+      }
+      setGuardando(false);
     }
     mostrarToast('Subcategoría guardada correctamente', 'ok');
     if (irAlFormulario) navigate('/auditor/formulario');
   };
+
+  if (cargando) {
+    return <div className="card empty"><div className="empty-t">Cargando categorías…</div></div>;
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', gap: 20, alignItems: 'start' }}>
@@ -190,8 +234,8 @@ export function CategoriasPage() {
                       <i className="ti ti-plus" /> Agregar subcategoría
                     </button>
                     <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-light)' }}>
-                      <button className="btn btn-primary" onClick={crearNuevaCategoriaCompleta}>
-                        <i className="ti ti-check" /> Crear categoría y continuar
+                      <button className="btn btn-primary" onClick={crearNuevaCategoriaCompleta} disabled={guardando}>
+                        <i className="ti ti-check" /> {guardando ? 'Creando…' : 'Crear categoría y continuar'}
                       </button>
                       <button className="btn" style={{ marginLeft: 8 }} onClick={() => { setMostrarWizardCat(false); setNuevaCatNombre(''); setNuevasSubcats(['']); }}>Cancelar</button>
                     </div>
@@ -246,10 +290,10 @@ export function CategoriasPage() {
               </div>
 
               <div className="form-footer">
-                <button className="btn btn-primary" onClick={() => guardarSubcategoria(true)}>
+                <button className="btn btn-primary" onClick={() => guardarSubcategoria(true)} disabled={guardando}>
                   <i className="ti ti-arrow-right" /> Guardar e ir al formulario
                 </button>
-                <button className="btn" onClick={() => guardarSubcategoria(false)}>
+                <button className="btn" onClick={() => guardarSubcategoria(false)} disabled={guardando}>
                   <i className="ti ti-plus" /> Guardar y agregar otra
                 </button>
               </div>

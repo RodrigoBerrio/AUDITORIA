@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
-import { usuarioActual } from '../../data/mockData';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { ToastHost } from '../ui/ToastHost';
 
@@ -18,7 +17,7 @@ const NAV_AUDITORIA = [
 /** Layout persistente del rol auditor/admin: sidebar + topbar + contenido de la ruta activa. */
 export function AuditorShell() {
   const navigate = useNavigate();
-  const { logout, pedirConfirmacion } = useAppStore();
+  const { logout, pedirConfirmacion, usuario, auditoriaActivaId } = useAppStore();
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
   const cerrarSesion = () => {
@@ -28,7 +27,8 @@ export function AuditorShell() {
     });
   };
 
-  const iniciales = usuarioActual.nombre.split(' ').map((p) => p[0]).slice(0, 2).join('');
+  const nombreUsuario = usuario?.nombre ?? 'Auditor';
+  const iniciales = nombreUsuario.split(' ').map((p) => p[0]).slice(0, 2).join('');
 
   return (
     <div className="shell">
@@ -63,8 +63,8 @@ export function AuditorShell() {
         <div className="sidebar-footer">
           <div className="avatar">{iniciales}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="user-name">{usuarioActual.nombre}</div>
-            <div className="user-role">Auditor certificado</div>
+            <div className="user-name">{nombreUsuario}</div>
+            <div className="user-role">{usuario?.rol === 'admin' ? 'Administrador' : usuario?.rol === 'supervisor' ? 'Supervisor' : 'Auditor certificado'}</div>
           </div>
           <button className="icon-btn-white" title="Cerrar sesión" aria-label="Cerrar sesión" onClick={cerrarSesion}>
             <i className="ti ti-logout" />
@@ -92,7 +92,11 @@ export function AuditorShell() {
             <button className="btn btn-sm" onClick={() => navigate('/auditor/empresas')}>
               <i className="ti ti-plus" /> <span className="btn-label">Nueva empresa</span>
             </button>
-            <button className="btn btn-primary btn-sm" onClick={() => navigate('/auditor/formulario')}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => navigate(auditoriaActivaId ? '/auditor/formulario' : '/auditor/empresas')}
+              title={auditoriaActivaId ? 'Continuar la auditoría activa' : 'Elige una empresa para iniciar una auditoría nueva'}
+            >
               <i className="ti ti-player-play" /> <span className="btn-label">Iniciar auditoría</span>
             </button>
           </div>

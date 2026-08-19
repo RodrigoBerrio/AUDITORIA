@@ -37,6 +37,14 @@ public class Reporte {
     @Column(name = "ruta_pdf", length = 255)
     private String rutaPdf;
 
+    /** null = alcance integral (toda la auditoría) — mismo significado que antes de que existiera esta columna. */
+    @Column(name = "alcance_tipo", length = 20)
+    private String alcanceTipo;
+
+    /** Nombre de la categoría o subcategoría cuando alcanceTipo no es null; null junto con alcanceTipo si es integral. */
+    @Column(name = "alcance_nombre", length = 150)
+    private String alcanceNombre;
+
     @Column(name = "generado_en", insertable = false, updatable = false)
     private Instant generadoEn;
 
@@ -44,15 +52,27 @@ public class Reporte {
         // JPA
     }
 
-    private Reporte(UUID auditoriaId, BigDecimal puntajeTotal, String rutaPdf) {
+    private Reporte(UUID auditoriaId, BigDecimal puntajeTotal, String rutaPdf, String alcanceTipo, String alcanceNombre) {
         this.auditoriaId = auditoriaId;
         this.puntajeTotal = puntajeTotal;
-        this.nivelMadurez = NivelMadurez.desde(puntajeTotal).getEtiqueta();
+        // puntajeTotal es null cuando el informe es de una categoría/subcategoría (Etapa 5) que
+        // todavía está en progreso — legítimo, no exigimos completarla para generar su preliminar.
+        this.nivelMadurez = puntajeTotal != null ? NivelMadurez.desde(puntajeTotal).getEtiqueta() : null;
         this.rutaPdf = Objects.requireNonNull(rutaPdf, "rutaPdf no puede ser nulo: el PDF ya debe estar subido antes de crear el reporte");
+        this.alcanceTipo = alcanceTipo;
+        this.alcanceNombre = alcanceNombre;
     }
 
+    /** Alcance integral (toda la auditoría) — el caso de siempre. */
     public static Reporte generar(UUID auditoriaId, BigDecimal puntajeTotal, String rutaPdf) {
-        return new Reporte(auditoriaId, puntajeTotal, rutaPdf);
+        return new Reporte(auditoriaId, puntajeTotal, rutaPdf, null, null);
+    }
+
+    /** Alcance acotado a una categoría o subcategoría (Etapa 5 — informes independientes). */
+    public static Reporte generarConAlcance(UUID auditoriaId, BigDecimal puntajeTotal, String rutaPdf, String alcanceTipo, String alcanceNombre) {
+        return new Reporte(auditoriaId, puntajeTotal, rutaPdf,
+                Objects.requireNonNull(alcanceTipo, "alcanceTipo no puede ser nulo"),
+                Objects.requireNonNull(alcanceNombre, "alcanceNombre no puede ser nulo"));
     }
 
     public UUID getId() {
@@ -73,6 +93,14 @@ public class Reporte {
 
     public String getRutaPdf() {
         return rutaPdf;
+    }
+
+    public String getAlcanceTipo() {
+        return alcanceTipo;
+    }
+
+    public String getAlcanceNombre() {
+        return alcanceNombre;
     }
 
     public Instant getGeneradoEn() {

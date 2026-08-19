@@ -1,8 +1,10 @@
 package com.auditoriaindustriales.bakend.empresas.application;
 
+import com.auditoriaindustriales.bakend.auditorias.application.AuditoriaService;
 import com.auditoriaindustriales.bakend.empresas.api.EmpresaMapper;
 import com.auditoriaindustriales.bakend.empresas.api.dto.EmpresaRequest;
 import com.auditoriaindustriales.bakend.empresas.api.dto.EmpresaResponse;
+import com.auditoriaindustriales.bakend.empresas.api.dto.HistoricoPuntoResponse;
 import com.auditoriaindustriales.bakend.empresas.domain.Empresa;
 import com.auditoriaindustriales.bakend.empresas.domain.EmpresaRepository;
 import com.auditoriaindustriales.bakend.empresas.infrastructure.EmpresaJpaRepository;
@@ -23,11 +25,26 @@ public class EmpresaService {
     // ver comentario en EmpresaJpaRepository sobre por qué es SQL nativo.
     private final EmpresaJpaRepository empresaJpaRepository;
     private final EmpresaMapper empresaMapper;
+    private final AuditoriaService auditoriaService;
 
-    public EmpresaService(EmpresaRepository empresaRepository, EmpresaJpaRepository empresaJpaRepository, EmpresaMapper empresaMapper) {
+    public EmpresaService(
+            EmpresaRepository empresaRepository,
+            EmpresaJpaRepository empresaJpaRepository,
+            EmpresaMapper empresaMapper,
+            AuditoriaService auditoriaService) {
         this.empresaRepository = empresaRepository;
         this.empresaJpaRepository = empresaJpaRepository;
         this.empresaMapper = empresaMapper;
+        this.auditoriaService = auditoriaService;
+    }
+
+    /** Tendencia de puntaje_global entre auditorías finalizadas sucesivas — solo se grafica si hay más de un punto. */
+    @Transactional(readOnly = true)
+    public List<HistoricoPuntoResponse> historico(UUID empresaId) {
+        empresaRepository.buscarPorId(empresaId).orElseThrow(() -> NotFoundException.of("Empresa", empresaId));
+        return auditoriaService.listarFinalizadasPorEmpresa(empresaId).stream()
+                .map(a -> new HistoricoPuntoResponse(a.fechaFin(), a.puntajeGlobal()))
+                .toList();
     }
 
     @Transactional(readOnly = true)

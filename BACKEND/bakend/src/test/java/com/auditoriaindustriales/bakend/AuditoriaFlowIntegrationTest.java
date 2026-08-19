@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -146,6 +147,11 @@ class AuditoriaFlowIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.nivelMadurez").value("Predictivo"))
                 .andExpect(jsonPath("$.rutaPdf").value("https://fake-storage.test/object/public/reportes/fake.pdf"));
+
+        // El PDF ya no es solo texto: trae al menos el radar y el ranking como imágenes PNG reales.
+        ArgumentCaptor<byte[]> pdfCapturado = ArgumentCaptor.forClass(byte[].class);
+        org.mockito.Mockito.verify(supabaseStorageClient).subir(anyString(), anyString(), pdfCapturado.capture(), anyString());
+        assertThat(pdfCapturado.getValue().length).isGreaterThan(20_000);
     }
 
     @Test

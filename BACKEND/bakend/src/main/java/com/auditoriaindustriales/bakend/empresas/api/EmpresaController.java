@@ -2,6 +2,7 @@ package com.auditoriaindustriales.bakend.empresas.api;
 
 import com.auditoriaindustriales.bakend.empresas.api.dto.EmpresaRequest;
 import com.auditoriaindustriales.bakend.empresas.api.dto.EmpresaResponse;
+import com.auditoriaindustriales.bakend.empresas.api.dto.HistoricoPuntoResponse;
 import com.auditoriaindustriales.bakend.empresas.application.EmpresaService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -45,5 +46,10 @@ public class EmpresaController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void eliminar(@PathVariable UUID id) {
         empresaService.eliminar(id);
+    }
+
+    @GetMapping("/{id}/historico")
+    public List<HistoricoPuntoResponse> historico(@PathVariable UUID id) {
+        return empresaService.historico(id);
     }
 }

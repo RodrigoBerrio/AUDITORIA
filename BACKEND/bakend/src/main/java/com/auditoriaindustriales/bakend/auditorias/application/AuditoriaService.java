@@ -4,6 +4,7 @@ import com.auditoriaindustriales.bakend.auditorias.api.AuditoriaMapper;
 import com.auditoriaindustriales.bakend.auditorias.api.dto.AuditoriaResponse;
 import com.auditoriaindustriales.bakend.auditorias.domain.Auditoria;
 import com.auditoriaindustriales.bakend.auditorias.domain.AuditoriaRepository;
+import com.auditoriaindustriales.bakend.auditorias.domain.EstadoAuditoria;
 import com.auditoriaindustriales.bakend.empresas.domain.EmpresaRepository;
 import com.auditoriaindustriales.bakend.shared.domain.NotFoundException;
 import com.auditoriaindustriales.bakend.shared.security.AutenticacionUsuario;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -68,6 +70,16 @@ public class AuditoriaService {
     /** Punto de entrada público para que otros módulos (ej. reportes) validen permisos sin exponer la entidad. */
     public void exigirPermisoEscritura(UUID auditoriaId, AutenticacionUsuario usuario) {
         buscarOFallar(auditoriaId).exigirPermisoEscritura(usuario);
+    }
+
+    /** Usado por el histórico de resultados (tendencia de puntaje_global entre auditorías sucesivas de una empresa). */
+    @Transactional(readOnly = true)
+    public List<AuditoriaResponse> listarFinalizadasPorEmpresa(UUID empresaId) {
+        return auditoriaRepository.listar().stream()
+                .filter(a -> a.getEmpresaId().equals(empresaId) && a.getEstado() == EstadoAuditoria.FINALIZADA)
+                .sorted(Comparator.comparing(Auditoria::getFechaFin))
+                .map(auditoriaMapper::toResponse)
+                .toList();
     }
 
     Auditoria buscarOFallar(UUID id) {

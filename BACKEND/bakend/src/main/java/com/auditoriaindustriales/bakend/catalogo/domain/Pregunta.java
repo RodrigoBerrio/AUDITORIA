@@ -34,6 +34,10 @@ public class Pregunta {
     @Column(length = 255)
     private String evidencia;
 
+    /** Agrupación interna dentro del cuestionario (2-8 por checklist); null se trata como "General" al agregar. */
+    @Column(length = 100)
+    private String seccion;
+
     @Column(name = "cuestionario_id", nullable = false)
     private UUID cuestionarioId;
 
@@ -44,22 +48,24 @@ public class Pregunta {
         // JPA
     }
 
-    private Pregunta(UUID cuestionarioId, int numero, String texto, String evidencia) {
+    private Pregunta(UUID cuestionarioId, int numero, String texto, String evidencia, String seccion) {
         this.cuestionarioId = cuestionarioId;
         this.numero = numero;
         this.texto = texto;
         this.evidencia = evidencia;
+        this.seccion = seccion;
         this.activo = true;
     }
 
-    public static Pregunta crear(UUID cuestionarioId, int numero, String texto, String evidencia) {
-        return new Pregunta(cuestionarioId, numero, texto, evidencia);
+    public static Pregunta crear(UUID cuestionarioId, int numero, String texto, String evidencia, String seccion) {
+        return new Pregunta(cuestionarioId, numero, texto, evidencia, seccion);
     }
 
     /** Solo cambia campos sin historial protegido; siempre permitido. */
-    public void actualizarSinTexto(int numero, String evidencia) {
+    public void actualizarSinTexto(int numero, String evidencia, String seccion) {
         this.numero = numero;
         this.evidencia = evidencia;
+        this.seccion = seccion;
     }
 
     /** Intento de UPDATE directo del enunciado; el trigger lo rechaza si ya hay respuestas. */
@@ -85,6 +91,10 @@ public class Pregunta {
 
     public String getEvidencia() {
         return evidencia;
+    }
+
+    public String getSeccion() {
+        return seccion;
     }
 
     public UUID getCuestionarioId() {

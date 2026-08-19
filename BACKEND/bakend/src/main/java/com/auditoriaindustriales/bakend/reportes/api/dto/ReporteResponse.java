@@ -5,5 +5,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record ReporteResponse(
-        UUID id, UUID auditoriaId, BigDecimal puntajeTotal, String nivelMadurez, String rutaPdf, Instant generadoEn) {
+        UUID id, UUID auditoriaId, BigDecimal puntajeTotal, String nivelMadurez, String rutaPdf, Instant generadoEn,
+        String alcanceTipo, String alcanceNombre) {
 }

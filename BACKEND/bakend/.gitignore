@@ -2,6 +2,12 @@ HELP.md
 target/
 .env
 .mvn/wrapper/maven-wrapper.jar
+
+### Entorno local de desarrollo/demo (Postgres embebido + storage simulado) ###
+local-dev/pgdata/
+local-dev/storage/
+local-dev/*.class
+local-dev/cp.txt
 !**/src/main/**/target/
 !**/src/test/**/target/
 

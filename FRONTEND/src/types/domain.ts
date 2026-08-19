@@ -76,6 +76,7 @@ export interface Pregunta {
   numero: number;
   texto: string;
   evidencia?: string;
+  seccion?: string;
   activo: boolean;
 }
 
@@ -105,6 +106,7 @@ export interface Respuesta {
   observacion?: string;
 }
 
+/** alcanceTipo/alcanceNombre null = informe integral (toda la auditoría); "categoria"/"subcategoria" = informe independiente de ese alcance (Etapa 5). */
 export interface Reporte {
   id: string;
   auditoriaId: string;
@@ -112,6 +114,8 @@ export interface Reporte {
   nivelMadurez?: string;
   rutaPdf?: string;
   generadoEn: string;
+  alcanceTipo?: 'categoria' | 'subcategoria';
+  alcanceNombre?: string;
 }
 
 export interface Hallazgo {
@@ -134,6 +138,92 @@ export interface EvidenciaFotografica {
   clienteUuid: string;
   tomadaEn?: string;
   subidaEn: string;
+}
+
+// ============================================================
+// Respuestas de los endpoints agregados de resultados gráficos
+// (GET /api/auditorias/:id/resumen|ranking|.../secciones|hallazgos/resumen,
+// GET /api/empresas/:id/historico). Ya vienen agregados y con el color de
+// semáforo calculado en backend — el front nunca recalcula el umbral.
+// ============================================================
+
+/**
+ * puntaje null + evaluada false = subcategoría del catálogo todavía sin completar (plano
+ * cartesiano vacío), no un puntaje de cero. detalle: desglose interno (por sección del/los
+ * cuestionario(s)), vacío mientras evaluada=false. enAlcance: alcance inferido (no declarado) —
+ * true en cuanto se aplicó al menos un cuestionario, distingue "no iniciada" de "en progreso".
+ */
+export interface PuntajeSubcategoria {
+  subcategoria: string;
+  categoria: string;
+  puntaje: number | null;
+  meta: number;
+  colorSemaforo: string;
+  evaluada: boolean;
+  detalle: ItemPuntaje[];
+  enAlcance: boolean;
+}
+
+/** Agregado por categoría: solo trae puntaje cuando completa=true — su histograma y radar propios solo se generan al completar todas sus subcategorías. subcategoriasEnAlcance distingue "sin empezar" de "en progreso" mientras nada está completo. */
+export interface PuntajeCategoria {
+  categoria: string;
+  puntaje: number | null;
+  colorSemaforo: string;
+  completa: boolean;
+  subcategoriasCompletas: number;
+  subcategoriasTotal: number;
+  subcategoriasEnAlcance: number;
+}
+
+export interface ResumenAuditoria {
+  puntajeGlobal: number | null;
+  nivelMadurez: string | null;
+  colorSemaforo: string;
+  subcategorias: PuntajeSubcategoria[];
+  preguntasRespondidas: number;
+  preguntasEsperadas: number;
+  categorias: PuntajeCategoria[];
+  catalogoCompleto: boolean;
+  subcategoriasEvaluadas: number;
+  subcategoriasTotal: number;
+  subcategoriasEnAlcance: number;
+}
+
+export interface ItemPuntaje {
+  etiqueta: string;
+  puntaje: number | null;
+  colorSemaforo: string;
+  evaluada: boolean;
+}
+
+export interface RankingResultado {
+  items: ItemPuntaje[];
+  preguntasRespondidas: number;
+  preguntasEsperadas: number;
+}
+
+export interface ConteoSeveridad {
+  severidad: Severidad;
+  cantidad: number;
+  porcentaje: number;
+  colorHex: string;
+}
+
+export interface ConteoEstado {
+  estado: EstadoHallazgo;
+  cantidad: number;
+  porcentaje: number;
+}
+
+export interface HallazgosResumen {
+  total: number;
+  porSeveridad: ConteoSeveridad[];
+  porEstado: ConteoEstado[];
+}
+
+export interface HistoricoPunto {
+  fechaFin: string;
+  puntajeGlobal: number | null;
 }
 
 /** Escala de madurez 1-5 con su etiqueta y descripción, tal como en el prototipo. */

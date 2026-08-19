@@ -42,15 +42,15 @@ public class PreguntaService {
 
     public PreguntaResponse crear(UUID cuestionarioId, PreguntaCrearRequest request) {
         cuestionarioRepository.buscarPorId(cuestionarioId).orElseThrow(() -> NotFoundException.of("Cuestionario", cuestionarioId));
-        Pregunta pregunta = Pregunta.crear(cuestionarioId, request.numero(), request.texto(), request.evidencia());
+        Pregunta pregunta = Pregunta.crear(cuestionarioId, request.numero(), request.texto(), request.evidencia(), request.seccion());
         // El trigger fn_sync_num_preguntas recalcula cuestionario.num_preguntas al hacer flush del INSERT.
         return preguntaMapper.toResponse(preguntaRepository.guardar(pregunta));
     }
 
-    /** Cambia numero/evidencia; nunca toca texto, así que siempre está permitido sin importar el historial. */
+    /** Cambia numero/evidencia/seccion; nunca toca texto, así que siempre está permitido sin importar el historial. */
     public PreguntaResponse actualizarSinTexto(UUID id, PreguntaActualizarRequest request) {
         Pregunta pregunta = buscarOFallar(id);
-        pregunta.actualizarSinTexto(request.numero(), request.evidencia());
+        pregunta.actualizarSinTexto(request.numero(), request.evidencia(), request.seccion());
         return preguntaMapper.toResponse(preguntaRepository.guardar(pregunta));
     }
 
@@ -64,7 +64,7 @@ public class PreguntaService {
         Pregunta pregunta = buscarOFallar(id);
         pregunta.editarTexto(request.texto());
         if (request.evidencia() != null) {
-            pregunta.actualizarSinTexto(pregunta.getNumero(), request.evidencia());
+            pregunta.actualizarSinTexto(pregunta.getNumero(), request.evidencia(), pregunta.getSeccion());
         }
         return preguntaMapper.toResponse(preguntaRepository.guardar(pregunta));
     }
@@ -80,7 +80,7 @@ public class PreguntaService {
         actual.desactivar();
         preguntaRepository.guardarInmediato(actual);
 
-        Pregunta nueva = Pregunta.crear(actual.getCuestionarioId(), actual.getNumero(), request.texto(), request.evidencia());
+        Pregunta nueva = Pregunta.crear(actual.getCuestionarioId(), actual.getNumero(), request.texto(), request.evidencia(), actual.getSeccion());
         return preguntaMapper.toResponse(preguntaRepository.guardar(nueva));
     }
 

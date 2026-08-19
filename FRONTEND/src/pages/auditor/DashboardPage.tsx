@@ -11,7 +11,7 @@ const ESTADO_BADGE: Record<string, { clase: string; icono: string; texto: string
 };
 
 export function DashboardPage() {
-  const accessToken = useAppStore((s) => s.accessToken);
+  const { accessToken, setEmpresaActiva, setAuditoriaActiva } = useAppStore();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [auditorias, setAuditorias] = useState<Auditoria[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -98,9 +98,20 @@ export function DashboardPage() {
                     <td>
                       <div className="t-actions">
                         {a.estado === 'en_progreso' ? (
-                          <Link className="btn btn-primary btn-sm" to="/auditor/formulario"><i className="ti ti-pencil" /> Continuar</Link>
+                          <>
+                            <Link
+                              className="btn btn-primary btn-sm"
+                              to="/auditor/formulario"
+                              onClick={() => { setEmpresaActiva(a.empresaId); setAuditoriaActiva(a.id); }}
+                            >
+                              <i className="ti ti-pencil" /> Continuar
+                            </Link>
+                            <Link className="btn btn-sm" to={`/auditor/auditorias/${a.id}/resultados`} title="Ver avance y generar informe preliminar">
+                              <i className="ti ti-chart-bar" /> Resultados
+                            </Link>
+                          </>
                         ) : (
-                          <Link className="btn btn-sm" to="/auditor/reportes"><i className="ti ti-chart-bar" /> Reporte</Link>
+                          <Link className="btn btn-sm" to={`/auditor/auditorias/${a.id}/resultados`}><i className="ti ti-chart-bar" /> Resultados</Link>
                         )}
                       </div>
                     </td>
