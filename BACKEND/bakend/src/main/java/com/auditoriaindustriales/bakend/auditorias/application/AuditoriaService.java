@@ -43,12 +43,21 @@ public class AuditoriaService {
         return auditoriaMapper.toResponse(buscarOFallar(id));
     }
 
+    /** Idempotente: si la empresa ya tiene una auditoría en_progreso, la reutiliza en vez de crear otra —
+     * evita duplicados cuando el usuario reintenta "Nueva auditoría" o cambia de empresa en el formulario. */
     public AuditoriaResponse crear(UUID empresaId, AutenticacionUsuario usuario) {
         empresaRepository.buscarPorId(empresaId).orElseThrow(() -> NotFoundException.of("Empresa", empresaId));
-        Auditoria auditoria = Auditoria.iniciar(empresaId, usuario.usuarioId());
-        Auditoria guardada = auditoriaRepository.guardar(auditoria);
-        log.info("auditoria={} iniciada por usuario={} para empresa={}", guardada.getId(), usuario.usuarioId(), empresaId);
-        return auditoriaMapper.toResponse(guardada);
+        return auditoriaRepository.buscarEnProgresoPorEmpresa(empresaId)
+                .map(existente -> {
+                    log.info("auditoria={} en_progreso reutilizada para empresa={}", existente.getId(), empresaId);
+                    return auditoriaMapper.toResponse(existente);
+                })
+                .orElseGet(() -> {
+                    Auditoria auditoria = Auditoria.iniciar(empresaId, usuario.usuarioId());
+                    Auditoria guardada = auditoriaRepository.guardar(auditoria);
+                    log.info("auditoria={} iniciada por usuario={} para empresa={}", guardada.getId(), usuario.usuarioId(), empresaId);
+                    return auditoriaMapper.toResponse(guardada);
+                });
     }
 
     public AuditoriaResponse finalizar(UUID id, AutenticacionUsuario usuario) {

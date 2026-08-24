@@ -11,4 +11,6 @@ public interface AuditoriaRepository {
     List<Auditoria> listar();
 
     Auditoria guardar(Auditoria auditoria);
+
+    Optional<Auditoria> buscarEnProgresoPorEmpresa(UUID empresaId);
 }
