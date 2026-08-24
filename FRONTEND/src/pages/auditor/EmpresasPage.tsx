@@ -14,6 +14,53 @@ const EMPTY_FORM: FormEmpresa = {
   codigoPostal: '', contacto: '', telefono: '', correo: '', descripcion: '',
 };
 
+/** Solo lectura: muestra los datos ya guardados de la empresa, sin campos editables. */
+function ModalVerEmpresa({ empresa, onCerrar }: { empresa: Empresa; onCerrar: () => void }) {
+  const campos: [string, string | undefined][] = [
+    ['Razón social', empresa.razonSocial],
+    ['NIT', empresa.nit],
+    ['Sector económico', empresa.sector],
+    ['N° de empleados', empresa.numEmpleados != null ? String(empresa.numEmpleados) : undefined],
+    ['Ciudad', empresa.ciudad],
+    ['Departamento', empresa.departamento],
+    ['Código postal', empresa.codigoPostal],
+    ['Contacto principal', empresa.contacto],
+    ['Teléfono de contacto', empresa.telefono],
+    ['Correo corporativo', empresa.correo],
+  ];
+
+  return (
+    <div className="overlay open" role="dialog" aria-modal="true" onClick={onCerrar}>
+      <div className="modal" style={{ maxWidth: 560, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-title">{empresa.razonSocial}</div>
+        <div className="modal-body" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
+            {campos.map(([etiqueta, valor]) => (
+              <div key={etiqueta}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.03em' }}>
+                  {etiqueta}
+                </div>
+                <div style={{ fontSize: 13.5, color: 'var(--text-1)', marginTop: 2 }}>{valor || '—'}</div>
+              </div>
+            ))}
+          </div>
+          {empresa.descripcion && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.03em' }}>
+                Descripción
+              </div>
+              <div style={{ fontSize: 13.5, color: 'var(--text-1)', marginTop: 2 }}>{empresa.descripcion}</div>
+            </div>
+          )}
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-primary" onClick={onCerrar}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EmpresasPage() {
   const navigate = useNavigate();
   const { mostrarToast, pedirConfirmacion, setEmpresaActiva, setAuditoriaActiva, accessToken } = useAppStore();
@@ -22,6 +69,7 @@ export function EmpresasPage() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [creandoAuditoriaId, setCreandoAuditoriaId] = useState<string | null>(null);
+  const [empresaViendo, setEmpresaViendo] = useState<Empresa | null>(null);
 
   const cargarEmpresas = () => {
     setCargando(true);
@@ -193,7 +241,7 @@ export function EmpresasPage() {
                   <td>{e.ultimaVisita}</td>
                   <td>
                     <div className="t-actions">
-                      <button className="btn btn-sm"><i className="ti ti-eye" /> Ver</button>
+                      <button className="btn btn-sm" onClick={() => setEmpresaViendo(e)}><i className="ti ti-eye" /> Ver</button>
                       <button className="btn btn-primary btn-sm" onClick={() => iniciarAuditoria(e.id)} disabled={creandoAuditoriaId === e.id}>
                         <i className="ti ti-plus" /> {creandoAuditoriaId === e.id ? 'Creando…' : 'Nueva auditoría'}
                       </button>
@@ -205,6 +253,8 @@ export function EmpresasPage() {
           </table>
         </div>
       </div>
+
+      {empresaViendo && <ModalVerEmpresa empresa={empresaViendo} onCerrar={() => setEmpresaViendo(null)} />}
     </div>
   );
 }
