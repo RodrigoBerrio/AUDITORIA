@@ -5,7 +5,7 @@ import { resultadosApi } from '../../api/resultadosApi';
 import { useAppStore, useProgresoCuestionario } from '../../store/useAppStore';
 import { QuestionCard } from '../../components/ui/QuestionCard';
 import type {
-  AuditoriaCuestionario, Categoria, Cuestionario, Empresa, Pregunta, PuntajeSubcategoria, Respuesta, ValorEscala,
+  Auditoria, AuditoriaCuestionario, Categoria, Cuestionario, Empresa, Pregunta, PuntajeSubcategoria, Respuesta, ValorEscala,
 } from '../../types/domain';
 
 type EstadoSubcategoria = 'completado' | 'en_progreso' | 'pendiente';
@@ -93,10 +93,14 @@ export function AuditoriaFormPage() {
   const navigate = useNavigate();
   const {
     empresaActivaId, auditoriaActivaId, cuestionarioActivoId, setCuestionarioActivo,
+    setEmpresaActiva, setAuditoriaActiva,
     respuestas, responder, mostrarToast, pedirConfirmacion, accessToken,
   } = useAppStore();
 
-  const [empresaActiva, setEmpresaActiva] = useState<Empresa | null>(null);
+  const [empresaDetalle, setEmpresaDetalle] = useState<Empresa | null>(null);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [auditoriaEnProgresoPorEmpresa, setAuditoriaEnProgresoPorEmpresa] = useState<Record<string, string>>({});
+  const [cambiandoEmpresa, setCambiandoEmpresa] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriaId, setCategoriaId] = useState('');
   const [subcategoriasDeCategoria, setSubcategoriasDeCategoria] = useState<{ id: string; nombre: string }[]>([]);
@@ -140,7 +144,7 @@ export function AuditoriaFormPage() {
       api.get<AuditoriaCuestionario[]>(`/api/auditorias/${auditoriaActivaId}/cuestionarios`, accessToken),
     ])
       .then(([empresa, cats, aplicadosRes]) => {
-        setEmpresaActiva(empresa);
+        setEmpresaDetalle(empresa);
         setCategorias(cats);
         setAplicados(Object.fromEntries(aplicadosRes.map((ac) => [ac.cuestionarioId, ac.id])));
         if (cats[0]) setCategoriaId(cats[0].id);
@@ -150,6 +154,41 @@ export function AuditoriaFormPage() {
     cargarResumen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auditoriaActivaId, empresaActivaId, accessToken]);
+
+  // Lista de empresas registradas (para el selector) y, por cada una, su auditoría en_progreso
+  // si ya tiene una — para saber si "cambiar de empresa" debe reanudar o crear una auditoría nueva.
+  useEffect(() => {
+    Promise.all([
+      api.get<Empresa[]>('/api/empresas', accessToken),
+      api.get<Auditoria[]>('/api/auditorias', accessToken),
+    ])
+      .then(([emps, auds]) => {
+        setEmpresas(emps);
+        setAuditoriaEnProgresoPorEmpresa(
+          Object.fromEntries(auds.filter((a) => a.estado === 'en_progreso').map((a) => [a.empresaId, a.id])),
+        );
+      })
+      .catch(() => {});
+  }, [accessToken]);
+
+  const cambiarEmpresa = async (nuevaEmpresaId: string) => {
+    if (!nuevaEmpresaId || nuevaEmpresaId === empresaActivaId) return;
+    setCambiandoEmpresa(true);
+    try {
+      let auditoriaId = auditoriaEnProgresoPorEmpresa[nuevaEmpresaId];
+      if (!auditoriaId) {
+        const nueva = await api.post<Auditoria>('/api/auditorias', { empresaId: nuevaEmpresaId }, accessToken);
+        auditoriaId = nueva.id;
+        setAuditoriaEnProgresoPorEmpresa((prev) => ({ ...prev, [nuevaEmpresaId]: auditoriaId }));
+      }
+      setEmpresaActiva(nuevaEmpresaId);
+      setAuditoriaActiva(auditoriaId);
+    } catch (err) {
+      mostrarToast(err instanceof ApiError ? err.message : 'No se pudo cambiar de empresa', 'warn');
+    } finally {
+      setCambiandoEmpresa(false);
+    }
+  };
 
   // Subcategorías de la categoría elegida.
   useEffect(() => {
@@ -286,7 +325,18 @@ export function AuditoriaFormPage() {
       <div className="audit-ctx" role="status" aria-live="polite">
         <div>
           <div className="ctx-lbl">Auditoría a la empresa :</div>
-          <div className="ctx-val">{empresaActiva?.razonSocial}</div>
+          <select
+            className="ctx-select"
+            value={empresaActivaId ?? ''}
+            onChange={(e) => cambiarEmpresa(e.target.value)}
+            disabled={cambiandoEmpresa}
+            title="Cambiar la empresa que se está auditando"
+          >
+            {empresaActivaId && !empresas.some((emp) => emp.id === empresaActivaId) && (
+              <option value={empresaActivaId}>{empresaDetalle?.razonSocial ?? '—'}</option>
+            )}
+            {empresas.map((emp) => <option key={emp.id} value={emp.id}>{emp.razonSocial}</option>)}
+          </select>
         </div>
         <div className="ctx-div" />
         <div>
@@ -368,7 +418,7 @@ export function AuditoriaFormPage() {
 
       <div className="form-footer" style={{ paddingTop: 0, border: 'none' }}>
         <button className="btn btn-primary" onClick={finalizarAuditoria} disabled={finalizando}>
-          <i className="ti ti-arrow-right" /> {finalizando ? 'Finalizando…' : 'Finalizar y generar reporte'}
+          <i className="ti ti-arrow-right" /> {finalizando ? 'Finalizando…' : 'Guardar respuestas'}
         </button>
         <button className="btn btn-ghost"><i className="ti ti-notes" /> Agregar observación general</button>
       </div>
