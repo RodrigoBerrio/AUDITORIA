@@ -4,14 +4,14 @@ import { api, ApiError } from '../../api/client';
 import { resultadosApi } from '../../api/resultadosApi';
 import { useAppStore } from '../../store/useAppStore';
 import { KpiCard } from '../../components/resultados/KpiCard';
-import { RadarCategorias } from '../../components/resultados/RadarCategorias';
+import { DonaSubcategorias } from '../../components/resultados/DonaSubcategorias';
 import { RankingBarras } from '../../components/resultados/RankingBarras';
 import { CategoriasProgreso } from '../../components/resultados/CategoriasProgreso';
 import { DonaHallazgos } from '../../components/resultados/DonaHallazgos';
 import { AvanceHallazgos } from '../../components/resultados/AvanceHallazgos';
 import { TendenciaHistorica } from '../../components/resultados/TendenciaHistorica';
 import type {
-  Auditoria, AuditoriaCuestionario, Cuestionario, HallazgosResumen, HistoricoPunto, ItemPuntaje, RankingResultado, ResumenAuditoria,
+  Auditoria, AuditoriaCuestionario, Cuestionario, HallazgosResumen, HistoricoPunto, RankingResultado, ResumenAuditoria,
 } from '../../types/domain';
 
 const META_DEFECTO = 4.0;
@@ -106,9 +106,6 @@ export function AuditoriaResultadosPage() {
 
   const categoriasPendientes = resumen.categorias.filter((c) => !c.completa).map((c) => c.categoria);
   const textoCategoriasPendientes = formatearListaCategorias(categoriasPendientes);
-  const histogramaCategoriasItems: ItemPuntaje[] = [...resumen.categorias]
-    .sort((a, b) => (a.puntaje ?? 0) - (b.puntaje ?? 0))
-    .map((c) => ({ etiqueta: c.categoria, puntaje: c.puntaje, colorSemaforo: c.colorSemaforo, evaluada: c.completa }));
 
   const generarPdf = async () => {
     if (!auditoriaId) return;
@@ -128,15 +125,17 @@ export function AuditoriaResultadosPage() {
 
   return (
     <div>
-      <div className="section-hd">
-        <div>
-          <div className="card-title" style={{ fontSize: 16 }}>Resultados de la auditoría</div>
-          <div className="card-sub">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', marginBottom: 12, gap: 12 }}>
+        <div />
+        <div style={{ textAlign: 'center' }}>
+          <div className="card-title" style={{ fontSize: 20 }}>Resultados de la auditoría</div>
+          <div className="card-sub" style={{ fontSize: 14 }}>
             {auditoria.fechaFin ? `Finalizada el ${auditoria.fechaFin}` : `Iniciada el ${auditoria.fechaInicio}`}
           </div>
         </div>
         <button
           className="btn btn-primary"
+          style={{ justifySelf: 'end' }}
           disabled={resumen.puntajeGlobal == null || generandoPdf}
           title={resumen.puntajeGlobal == null ? 'Responde al menos un cuestionario para generar el informe' : undefined}
           onClick={generarPdf}
@@ -154,6 +153,40 @@ export function AuditoriaResultadosPage() {
         <p className="hint" style={{ marginBottom: 16 }}>
           <i className="ti ti-info-circle" /> Responde al menos un cuestionario para poder generar el informe.
         </p>
+      )}
+
+      {/* Orden de presentación pedido por el usuario: primero el detalle por categoría/subcategoría
+          (radar+histograma de la categoría, grid de subcategorías, ranking y detalle por sección),
+          y solo después el resumen ejecutivo (calificación general/avance, KPI, área más débil). */}
+      <div style={{ marginBottom: 20 }}>
+        <CategoriasProgreso auditoriaId={auditoriaId!} empresaId={auditoria.empresaId} categorias={resumen.categorias} subcategorias={resumen.subcategorias} />
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <RankingBarras titulo="Ranking de subcategorías" subtitulo="De menor a mayor puntaje" items={ranking.items} mensajeVacio="Aplica un cuestionario para ver el ranking." />
+      </div>
+
+      {aplicados.length > 0 && secciones && (
+        <div style={{ marginBottom: 20 }}>
+          <RankingBarras
+            titulo="Detalle por sección"
+            subtitulo="Promedio de respuestas agrupado por sección dentro del cuestionario seleccionado"
+            items={secciones.items}
+            mensajeVacio="Este cuestionario todavía no tiene respuestas."
+            headerExtra={
+              <select
+                className="ctx-select"
+                style={{ color: 'var(--text-1)', background: 'var(--surface)', border: '1px solid var(--border)' }}
+                value={cuestionarioSeleccionado}
+                onChange={(e) => setCuestionarioSeleccionado(e.target.value)}
+              >
+                {aplicados.map((ac) => (
+                  <option key={ac.cuestionarioId} value={ac.cuestionarioId}>{ac.nombre}</option>
+                ))}
+              </select>
+            }
+          />
+        </div>
       )}
 
       {/* Calificación general: solo es "oficial" cuando TODO el catálogo activo quedó evaluado — mientras tanto se muestra el avance. */}
@@ -177,9 +210,8 @@ export function AuditoriaResultadosPage() {
               {resumen.puntajeGlobal?.toFixed(1)} / 5.0
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Calificación general — {resumen.nivelMadurez}</div>
-            <div className="g2" style={{ alignItems: 'stretch', marginTop: 16 }}>
-              <RadarCategorias categorias={resumen.categorias} />
-              <RankingBarras titulo="Histograma general por categoría" subtitulo="De menor a mayor puntaje" items={histogramaCategoriasItems} />
+            <div style={{ marginTop: 16 }}>
+              <DonaSubcategorias subcategorias={resumen.subcategorias} />
             </div>
           </>
         ) : (
@@ -232,38 +264,6 @@ export function AuditoriaResultadosPage() {
           )}
         </div>
       </div>
-
-      <div style={{ marginBottom: 20 }}>
-        <CategoriasProgreso auditoriaId={auditoriaId!} empresaId={auditoria.empresaId} categorias={resumen.categorias} subcategorias={resumen.subcategorias} />
-      </div>
-
-      {/* Nivel 2 — Priorización */}
-      <div style={{ marginBottom: 20 }}>
-        <RankingBarras titulo="Ranking de subcategorías" subtitulo="De menor a mayor puntaje" items={ranking.items} mensajeVacio="Aplica un cuestionario para ver el ranking." />
-      </div>
-
-      {aplicados.length > 0 && secciones && (
-        <div style={{ marginBottom: 20 }}>
-          <RankingBarras
-            titulo="Detalle por sección"
-            subtitulo="Promedio de respuestas agrupado por sección dentro del cuestionario seleccionado"
-            items={secciones.items}
-            mensajeVacio="Este cuestionario todavía no tiene respuestas."
-            headerExtra={
-              <select
-                className="ctx-select"
-                style={{ color: 'var(--text-1)', background: 'var(--surface)', border: '1px solid var(--border)' }}
-                value={cuestionarioSeleccionado}
-                onChange={(e) => setCuestionarioSeleccionado(e.target.value)}
-              >
-                {aplicados.map((ac) => (
-                  <option key={ac.cuestionarioId} value={ac.cuestionarioId}>{ac.nombre}</option>
-                ))}
-              </select>
-            }
-          />
-        </div>
-      )}
 
       {/* Nivel 3 — Hallazgos y riesgo */}
       <div className="report-grid" style={{ marginTop: 20 }}>
