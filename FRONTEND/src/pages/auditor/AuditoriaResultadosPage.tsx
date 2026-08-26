@@ -5,11 +5,8 @@ import { resultadosApi } from '../../api/resultadosApi';
 import { useAppStore } from '../../store/useAppStore';
 import { KpiCard } from '../../components/resultados/KpiCard';
 import { CategoriasProgreso } from '../../components/resultados/CategoriasProgreso';
-import { DonaHallazgos } from '../../components/resultados/DonaHallazgos';
-import { AvanceHallazgos } from '../../components/resultados/AvanceHallazgos';
-import { TendenciaHistorica } from '../../components/resultados/TendenciaHistorica';
 import type {
-  Auditoria, AuditoriaCuestionario, Cuestionario, HallazgosResumen, HistoricoPunto, ResumenAuditoria, Subcategoria,
+  Auditoria, AuditoriaCuestionario, Cuestionario, ResumenAuditoria, Subcategoria,
 } from '../../types/domain';
 
 const META_DEFECTO = 4.0;
@@ -32,8 +29,6 @@ export function AuditoriaResultadosPage() {
 
   const [auditoria, setAuditoria] = useState<Auditoria | null>(null);
   const [resumen, setResumen] = useState<ResumenAuditoria | null>(null);
-  const [hallazgosResumen, setHallazgosResumen] = useState<HallazgosResumen | null>(null);
-  const [historico, setHistorico] = useState<HistoricoPunto[]>([]);
   const [aplicados, setAplicados] = useState<CuestionarioAplicadoConNombre[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +42,11 @@ export function AuditoriaResultadosPage() {
     Promise.all([
       api.get<Auditoria>(`/api/auditorias/${auditoriaId}`, accessToken),
       resultadosApi.obtenerResumen(auditoriaId, accessToken, META_DEFECTO),
-      resultadosApi.obtenerHallazgosResumen(auditoriaId, accessToken),
       api.get<AuditoriaCuestionario[]>(`/api/auditorias/${auditoriaId}/cuestionarios`, accessToken),
     ])
-      .then(async ([auditoriaRes, resumenRes, hallazgosRes, aplicadosRes]) => {
+      .then(async ([auditoriaRes, resumenRes, aplicadosRes]) => {
         setAuditoria(auditoriaRes);
         setResumen(resumenRes);
-        setHallazgosResumen(hallazgosRes);
 
         // Cada cuestionario aplicado se etiqueta con el nombre de SU categoría (vía su subcategoría)
         // para poder mostrar "Detalle por sección" y la dona de subcategorías por separado por categoría.
@@ -66,9 +59,6 @@ export function AuditoriaResultadosPage() {
           }),
         );
         setAplicados(conNombre);
-
-        const historicoRes = await resultadosApi.obtenerHistorico(auditoriaRes.empresaId, accessToken);
-        setHistorico(historicoRes);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los resultados de la auditoría.'))
       .finally(() => setCargando(false));
@@ -78,7 +68,7 @@ export function AuditoriaResultadosPage() {
     return <div className="card empty"><div className="empty-t">Cargando resultados…</div></div>;
   }
 
-  if (error || !auditoria || !resumen || !hallazgosResumen) {
+  if (error || !auditoria || !resumen) {
     return (
       <div className="card empty">
         <i className="ti ti-alert-triangle" />
@@ -230,18 +220,6 @@ export function AuditoriaResultadosPage() {
           )}
         </div>
       </div>
-
-      {/* Nivel 3 — Hallazgos y riesgo */}
-      <div className="report-grid" style={{ marginTop: 20 }}>
-        <DonaHallazgos total={hallazgosResumen.total} porSeveridad={hallazgosResumen.porSeveridad} />
-        <AvanceHallazgos total={hallazgosResumen.total} porEstado={hallazgosResumen.porEstado} />
-      </div>
-
-      {historico.length > 1 && (
-        <div style={{ marginTop: 20 }}>
-          <TendenciaHistorica historico={historico} meta={META_DEFECTO} />
-        </div>
-      )}
 
       <p style={{ marginTop: 20 }}>
         <Link className="btn btn-sm" to="/auditor/reportes"><i className="ti ti-arrow-left" /> Volver a reportes</Link>
