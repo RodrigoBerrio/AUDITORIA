@@ -58,14 +58,14 @@ export function RankingBarras({ titulo, subtitulo, items, mensajeVacio, headerEx
         </ol>
       }
     >
-      <ResponsiveContainer width="100%" height={Math.max(120, datos.length * 42 + 20)}>
+      <ResponsiveContainer width="100%" height={Math.max(120, datos.length * 60 + 20)}>
         <BarChart data={datos} layout="vertical" margin={{ top: 4, right: 68, bottom: 4, left: 4 }}>
           <XAxis type="number" domain={[0, 5]} tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
           <YAxis
             type="category"
             dataKey="etiqueta"
-            width={140}
-            tick={{ fontSize: 12, fill: 'var(--text-1)' }}
+            width={165}
+            tick={{ fontSize: 11.5, fill: 'var(--text-1)' }}
             axisLine={false}
             tickLine={false}
           />
