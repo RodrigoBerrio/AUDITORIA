@@ -1,18 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RadarMadurez } from './RadarMadurez';
 import { RankingBarras } from './RankingBarras';
+import { DonaSubcategorias } from './DonaSubcategorias';
 import { NIVELES_DETALLE } from '../../config/semaforoDetalle';
 import { resultadosApi } from '../../api/resultadosApi';
 import { useAppStore } from '../../store/useAppStore';
 import { ApiError } from '../../api/client';
-import type { ItemPuntaje, PuntajeCategoria, PuntajeSubcategoria } from '../../types/domain';
+import type { ItemPuntaje, PuntajeCategoria, PuntajeSubcategoria, RankingResultado } from '../../types/domain';
+
+interface CuestionarioAplicado {
+  cuestionarioId: string;
+  nombre: string;
+  categoria: string;
+}
 
 interface CategoriasProgresoProps {
   auditoriaId: string;
   empresaId: string;
   categorias: PuntajeCategoria[];
   subcategorias: PuntajeSubcategoria[];
+  aplicados: CuestionarioAplicado[];
 }
 
 /** Anillo de progreso (SVG) — reemplaza la pill de texto "En progreso" por un indicador visual del avance de la categoría. */
@@ -97,7 +105,7 @@ function BotonGenerarInforme({ auditoriaId, alcance, compacto }: { auditoriaId: 
  * del spec). Cada subcategoría completa recibe además su propio panel con el desglose interno de
  * su(s) cuestionario(s) (por sección si el catálogo las tiene, o un bloque por cuestionario si no).
  */
-export function CategoriasProgreso({ auditoriaId, empresaId, categorias, subcategorias }: CategoriasProgresoProps) {
+export function CategoriasProgreso({ auditoriaId, empresaId, categorias, subcategorias, aplicados }: CategoriasProgresoProps) {
   if (categorias.length === 0) {
     return null;
   }
@@ -114,6 +122,13 @@ export function CategoriasProgreso({ auditoriaId, empresaId, categorias, subcate
           if (!cat.completa) {
             // Alcance inferido (no declarado): 0 subcategorías tocadas es "no iniciada", distinto de "en progreso" sin completar aún.
             const iniciada = cat.subcategoriasEnAlcance > 0;
+            // Mientras la categoría no está completa no tiene radar/histograma propio, pero las
+            // subcategorías que ya se evaluaron igual merecen un ranking aquí mismo (no solo cuando
+            // se complete el 100%) — nunca mezclado con las de otra categoría.
+            const evaluadasDeEstaCategoria: ItemPuntaje[] = subcategorias
+              .filter((s) => s.categoria === cat.categoria && s.evaluada)
+              .sort((a, b) => (a.puntaje ?? 0) - (b.puntaje ?? 0))
+              .map((s) => ({ etiqueta: s.subcategoria, puntaje: s.puntaje, colorSemaforo: s.colorSemaforo, evaluada: s.evaluada }));
             return (
               <div key={cat.categoria} className="card" style={{ marginBottom: 0 }}>
                 <div className="card-hd">
@@ -133,24 +148,58 @@ export function CategoriasProgreso({ auditoriaId, empresaId, categorias, subcate
                     {iniciada && <BotonGenerarInforme auditoriaId={auditoriaId} alcance={{ tipo: 'categoria', nombre: cat.categoria }} compacto />}
                   </div>
                 </div>
-                <div className="hint" style={{ marginTop: 4 }}>
+                <div className="hint" style={{ marginTop: 4, marginBottom: evaluadasDeEstaCategoria.length > 0 ? 16 : 0 }}>
                   Faltan {cat.subcategoriasTotal - cat.subcategoriasCompletas} subcategoría(s) para generar su radar y desglose.
                 </div>
+                {evaluadasDeEstaCategoria.length > 0 && (
+                  <RankingBarras
+                    titulo={`Ranking de subcategorías — ${cat.categoria}`}
+                    subtitulo="De menor a mayor puntaje (solo lo ya evaluado)"
+                    items={evaluadasDeEstaCategoria}
+                  />
+                )}
               </div>
             );
           }
 
           const subsCategoria = subcategorias.filter((s) => s.categoria === cat.categoria);
-          return <CategoriaCompletaCard key={cat.categoria} auditoriaId={auditoriaId} categoria={cat} subcategorias={subsCategoria} />;
+          const aplicadosCategoria = aplicados.filter((a) => a.categoria === cat.categoria);
+          return (
+            <CategoriaCompletaCard
+              key={cat.categoria}
+              auditoriaId={auditoriaId}
+              categoria={cat}
+              subcategorias={subsCategoria}
+              aplicados={aplicadosCategoria}
+            />
+          );
         })}
       </div>
     </div>
   );
 }
 
-function CategoriaCompletaCard({ auditoriaId, categoria, subcategorias }: { auditoriaId: string; categoria: PuntajeCategoria; subcategorias: PuntajeSubcategoria[] }) {
+function CategoriaCompletaCard({
+  auditoriaId, categoria, subcategorias, aplicados,
+}: { auditoriaId: string; categoria: PuntajeCategoria; subcategorias: PuntajeSubcategoria[]; aplicados: CuestionarioAplicado[] }) {
+  const { accessToken } = useAppStore();
   const [vistaTabla, setVistaTabla] = useState(false);
+  const [cuestionarioSeleccionado, setCuestionarioSeleccionado] = useState(aplicados[0]?.cuestionarioId ?? '');
+  const [secciones, setSecciones] = useState<RankingResultado | null>(null);
   const zonaCritica = subcategorias.filter((s) => s.detalle.some((d) => d.puntaje != null && d.puntaje < 2)).length;
+
+  // "aplicados" llega en un segundo momento (requiere una vuelta extra por cuestionario/subcategoria
+  // en el padre) — si el dropdown todavía no tiene selección cuando por fin llega, se inicializa aquí.
+  useEffect(() => {
+    if (!cuestionarioSeleccionado && aplicados.length > 0) {
+      setCuestionarioSeleccionado(aplicados[0].cuestionarioId);
+    }
+  }, [aplicados, cuestionarioSeleccionado]);
+
+  useEffect(() => {
+    if (!cuestionarioSeleccionado) { setSecciones(null); return; }
+    resultadosApi.obtenerSeccionesCuestionario(auditoriaId, cuestionarioSeleccionado, accessToken).then(setSecciones);
+  }, [auditoriaId, cuestionarioSeleccionado, accessToken]);
 
   const histogramaItems: ItemPuntaje[] = [...subcategorias]
     .sort((a, b) => (a.puntaje ?? 0) - (b.puntaje ?? 0))
@@ -175,21 +224,6 @@ function CategoriaCompletaCard({ auditoriaId, categoria, subcategorias }: { audi
       <div className="g2" style={{ alignItems: 'stretch', marginBottom: 16 }}>
         <RadarMadurez subcategorias={subcategorias} />
         <RankingBarras titulo={`Histograma — ${categoria.categoria}`} subtitulo="De menor a mayor puntaje" items={histogramaItems} />
-      </div>
-
-      <div className="metrics" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
-        <div className="metric">
-          <div className="metric-value">{categoria.puntaje?.toFixed(1)}</div>
-          <div className="metric-label">Puntaje global</div>
-        </div>
-        <div className="metric t-ok">
-          <div className="metric-value">{subcategorias.length}</div>
-          <div className="metric-label">Subcategorías evaluadas</div>
-        </div>
-        <div className={zonaCritica > 0 ? 'metric t-danger' : 'metric'}>
-          <div className="metric-value">{zonaCritica}</div>
-          <div className="metric-label">Subcategorías en zona crítica</div>
-        </div>
       </div>
 
       <div
@@ -238,6 +272,48 @@ function CategoriaCompletaCard({ auditoriaId, categoria, subcategorias }: { audi
           ))}
         </div>
       )}
+
+      {secciones && aplicados.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <RankingBarras
+            titulo={`Detalle por sección — ${categoria.categoria}`}
+            subtitulo="Promedio de respuestas agrupado por sección dentro del cuestionario seleccionado"
+            items={secciones.items}
+            mensajeVacio="Este cuestionario todavía no tiene respuestas."
+            headerExtra={
+              <select
+                className="ctx-select"
+                style={{ color: 'var(--text-1)', background: 'var(--surface)', border: '1px solid var(--border)' }}
+                value={cuestionarioSeleccionado}
+                onChange={(e) => setCuestionarioSeleccionado(e.target.value)}
+              >
+                {aplicados.map((ac) => (
+                  <option key={ac.cuestionarioId} value={ac.cuestionarioId}>{ac.nombre}</option>
+                ))}
+              </select>
+            }
+          />
+        </div>
+      )}
+
+      <div style={{ marginTop: 16 }}>
+        <DonaSubcategorias subcategorias={subcategorias} />
+      </div>
+
+      <div className="metrics" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 16 }}>
+        <div className="metric">
+          <div className="metric-value">{categoria.puntaje?.toFixed(1)}</div>
+          <div className="metric-label">Puntaje global</div>
+        </div>
+        <div className="metric t-ok">
+          <div className="metric-value">{subcategorias.length}</div>
+          <div className="metric-label">Subcategorías evaluadas</div>
+        </div>
+        <div className={zonaCritica > 0 ? 'metric t-danger' : 'metric'}>
+          <div className="metric-value">{zonaCritica}</div>
+          <div className="metric-label">Subcategorías en zona crítica</div>
+        </div>
+      </div>
     </div>
   );
 }

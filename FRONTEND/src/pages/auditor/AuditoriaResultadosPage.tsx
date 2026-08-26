@@ -4,20 +4,19 @@ import { api, ApiError } from '../../api/client';
 import { resultadosApi } from '../../api/resultadosApi';
 import { useAppStore } from '../../store/useAppStore';
 import { KpiCard } from '../../components/resultados/KpiCard';
-import { DonaSubcategorias } from '../../components/resultados/DonaSubcategorias';
-import { RankingBarras } from '../../components/resultados/RankingBarras';
 import { CategoriasProgreso } from '../../components/resultados/CategoriasProgreso';
 import { DonaHallazgos } from '../../components/resultados/DonaHallazgos';
 import { AvanceHallazgos } from '../../components/resultados/AvanceHallazgos';
 import { TendenciaHistorica } from '../../components/resultados/TendenciaHistorica';
 import type {
-  Auditoria, AuditoriaCuestionario, Cuestionario, HallazgosResumen, HistoricoPunto, RankingResultado, ResumenAuditoria,
+  Auditoria, AuditoriaCuestionario, Cuestionario, HallazgosResumen, HistoricoPunto, ResumenAuditoria, Subcategoria,
 } from '../../types/domain';
 
 const META_DEFECTO = 4.0;
 
 interface CuestionarioAplicadoConNombre extends AuditoriaCuestionario {
   nombre: string;
+  categoria: string;
 }
 
 /** "la categoría X" / "las categorías X y Y" / "las categorías X, Y y Z" — para nombrar lo que falta en vez de hablar en abstracto de "el catálogo". */
@@ -33,12 +32,9 @@ export function AuditoriaResultadosPage() {
 
   const [auditoria, setAuditoria] = useState<Auditoria | null>(null);
   const [resumen, setResumen] = useState<ResumenAuditoria | null>(null);
-  const [ranking, setRanking] = useState<RankingResultado | null>(null);
   const [hallazgosResumen, setHallazgosResumen] = useState<HallazgosResumen | null>(null);
   const [historico, setHistorico] = useState<HistoricoPunto[]>([]);
   const [aplicados, setAplicados] = useState<CuestionarioAplicadoConNombre[]>([]);
-  const [cuestionarioSeleccionado, setCuestionarioSeleccionado] = useState<string>('');
-  const [secciones, setSecciones] = useState<RankingResultado | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generandoPdf, setGenerandoPdf] = useState(false);
@@ -51,24 +47,25 @@ export function AuditoriaResultadosPage() {
     Promise.all([
       api.get<Auditoria>(`/api/auditorias/${auditoriaId}`, accessToken),
       resultadosApi.obtenerResumen(auditoriaId, accessToken, META_DEFECTO),
-      resultadosApi.obtenerRanking(auditoriaId, accessToken),
       resultadosApi.obtenerHallazgosResumen(auditoriaId, accessToken),
       api.get<AuditoriaCuestionario[]>(`/api/auditorias/${auditoriaId}/cuestionarios`, accessToken),
     ])
-      .then(async ([auditoriaRes, resumenRes, rankingRes, hallazgosRes, aplicadosRes]) => {
+      .then(async ([auditoriaRes, resumenRes, hallazgosRes, aplicadosRes]) => {
         setAuditoria(auditoriaRes);
         setResumen(resumenRes);
-        setRanking(rankingRes);
         setHallazgosResumen(hallazgosRes);
 
+        // Cada cuestionario aplicado se etiqueta con el nombre de SU categoría (vía su subcategoría)
+        // para poder mostrar "Detalle por sección" y la dona de subcategorías por separado por categoría.
         const conNombre = await Promise.all(
           aplicadosRes.map(async (ac) => {
             const cuestionario = await api.get<Cuestionario>(`/api/cuestionarios/${ac.cuestionarioId}`, accessToken);
-            return { ...ac, nombre: cuestionario.nombre };
+            const subcategoria = await api.get<Subcategoria>(`/api/subcategorias/${cuestionario.subcategoriaId}`, accessToken);
+            const categoria = resumenRes.subcategorias.find((s) => s.subcategoria === subcategoria.nombre)?.categoria ?? '';
+            return { ...ac, nombre: cuestionario.nombre, categoria };
           }),
         );
         setAplicados(conNombre);
-        setCuestionarioSeleccionado(conNombre[0]?.cuestionarioId ?? '');
 
         const historicoRes = await resultadosApi.obtenerHistorico(auditoriaRes.empresaId, accessToken);
         setHistorico(historicoRes);
@@ -77,19 +74,11 @@ export function AuditoriaResultadosPage() {
       .finally(() => setCargando(false));
   }, [auditoriaId, accessToken]);
 
-  useEffect(() => {
-    if (!auditoriaId || !cuestionarioSeleccionado) {
-      setSecciones(null);
-      return;
-    }
-    resultadosApi.obtenerSeccionesCuestionario(auditoriaId, cuestionarioSeleccionado, accessToken).then(setSecciones);
-  }, [auditoriaId, cuestionarioSeleccionado, accessToken]);
-
   if (cargando) {
     return <div className="card empty"><div className="empty-t">Cargando resultados…</div></div>;
   }
 
-  if (error || !auditoria || !resumen || !ranking || !hallazgosResumen) {
+  if (error || !auditoria || !resumen || !hallazgosResumen) {
     return (
       <div className="card empty">
         <i className="ti ti-alert-triangle" />
@@ -155,39 +144,19 @@ export function AuditoriaResultadosPage() {
         </p>
       )}
 
-      {/* Orden de presentación pedido por el usuario: primero el detalle por categoría/subcategoría
-          (radar+histograma de la categoría, grid de subcategorías, ranking y detalle por sección),
-          y solo después el resumen ejecutivo (calificación general/avance, KPI, área más débil). */}
+      {/* Orden de presentación pedido por el usuario: por cada categoría, todo junto en su propia
+          tarjeta — radar+histograma, grid de subcategorías, detalle por sección y dona de
+          calificaciones (ver CategoriasProgreso) — y solo después el resumen ejecutivo
+          (calificación general/avance, KPI, área más débil). */}
       <div style={{ marginBottom: 20 }}>
-        <CategoriasProgreso auditoriaId={auditoriaId!} empresaId={auditoria.empresaId} categorias={resumen.categorias} subcategorias={resumen.subcategorias} />
+        <CategoriasProgreso
+          auditoriaId={auditoriaId!}
+          empresaId={auditoria.empresaId}
+          categorias={resumen.categorias}
+          subcategorias={resumen.subcategorias}
+          aplicados={aplicados}
+        />
       </div>
-
-      <div style={{ marginBottom: 20 }}>
-        <RankingBarras titulo="Ranking de subcategorías" subtitulo="De menor a mayor puntaje" items={ranking.items} mensajeVacio="Aplica un cuestionario para ver el ranking." />
-      </div>
-
-      {aplicados.length > 0 && secciones && (
-        <div style={{ marginBottom: 20 }}>
-          <RankingBarras
-            titulo="Detalle por sección"
-            subtitulo="Promedio de respuestas agrupado por sección dentro del cuestionario seleccionado"
-            items={secciones.items}
-            mensajeVacio="Este cuestionario todavía no tiene respuestas."
-            headerExtra={
-              <select
-                className="ctx-select"
-                style={{ color: 'var(--text-1)', background: 'var(--surface)', border: '1px solid var(--border)' }}
-                value={cuestionarioSeleccionado}
-                onChange={(e) => setCuestionarioSeleccionado(e.target.value)}
-              >
-                {aplicados.map((ac) => (
-                  <option key={ac.cuestionarioId} value={ac.cuestionarioId}>{ac.nombre}</option>
-                ))}
-              </select>
-            }
-          />
-        </div>
-      )}
 
       {/* Calificación general: solo es "oficial" cuando TODO el catálogo activo quedó evaluado — mientras tanto se muestra el avance. */}
       <div
@@ -210,9 +179,6 @@ export function AuditoriaResultadosPage() {
               {resumen.puntajeGlobal?.toFixed(1)} / 5.0
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Calificación general — {resumen.nivelMadurez}</div>
-            <div style={{ marginTop: 16 }}>
-              <DonaSubcategorias subcategorias={resumen.subcategorias} />
-            </div>
           </>
         ) : (
           <>
