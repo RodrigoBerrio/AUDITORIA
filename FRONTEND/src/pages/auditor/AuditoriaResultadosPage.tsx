@@ -5,6 +5,8 @@ import { resultadosApi } from '../../api/resultadosApi';
 import { useAppStore } from '../../store/useAppStore';
 import { KpiCard } from '../../components/resultados/KpiCard';
 import { CategoriasProgreso } from '../../components/resultados/CategoriasProgreso';
+import { RadarCategorias } from '../../components/resultados/RadarCategorias';
+import { HistogramaCategorias } from '../../components/resultados/HistogramaCategorias';
 import type {
   Auditoria, AuditoriaCuestionario, Cuestionario, ResumenAuditoria, Subcategoria,
 } from '../../types/domain';
@@ -219,6 +221,11 @@ export function AuditoriaResultadosPage() {
             <p className="hint">Sin cuestionarios aplicados aún.</p>
           )}
         </div>
+      </div>
+
+      <div className="g2" style={{ marginTop: 20, alignItems: 'stretch' }}>
+        <RadarCategorias categorias={resumen.categorias} meta={META_DEFECTO} />
+        <HistogramaCategorias categorias={resumen.categorias} />
       </div>
 
       <p style={{ marginTop: 20 }}>
