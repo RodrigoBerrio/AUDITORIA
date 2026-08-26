@@ -29,14 +29,18 @@ export function CategoryTree({ categorias, subcategoriasPorCategoria, selecciona
     <div className="tree" id="dyn-tree">
       {categorias.map((cat) => {
         const hijos = subcategoriasPorCategoria[cat.id] ?? [];
-        const abierto = expandido[cat.id] ?? true;
         const catSeleccionada = seleccionado?.tipo === 'categoria' && seleccionado.id === cat.id;
+        // Dropdown por categoría: cerrado por defecto (evita una lista larguísima con varias
+        // categorías), salvo que la propia categoría o una de sus subcategorías esté seleccionada.
+        const subSeleccionadaAqui = seleccionado?.tipo === 'subcategoria' && hijos.some((h) => h.id === seleccionado.id);
+        const abierto = expandido[cat.id] ?? (catSeleccionada || subSeleccionadaAqui);
         return (
           <div key={cat.id}>
             <div
               className={`tree-row${catSeleccionada ? ' sel' : ''}`}
               onClick={() => { toggle(cat.id); onSeleccionar({ tipo: 'categoria', id: cat.id }); }}
             >
+              <i className={`ti ti-chevron-right`} style={{ fontSize: 12, transition: 'transform .15s', transform: abierto ? 'rotate(90deg)' : 'none' }} />
               <i className={`ti ${abierto ? 'ti-folder-open' : 'ti-folder'}`} />
               {cat.nombre}
             </div>
