@@ -1,57 +1,85 @@
-# bakend — Auditorías Industriales SAS
+# Auditoría Empresarial
 
-Backend Spring Boot (monolito modular) para la aplicación de auditorías industriales. Ver `DOCS/PROMPT_corregido.md` en la raíz del repo para el contexto completo de arquitectura y alcance.
+Aplicación web full-stack para la gestión de auditorías empresariales, con evaluación jerárquica por categorías, generación de informes progresivos y dashboards ejecutivos.
 
-## Requisitos
+## ¿Qué resuelve?
 
-- Java 21
-- Maven (o usar `./mvnw`)
-- Un proyecto Supabase con el esquema aplicado (`FRONTEND/supabase/migrations/*.sql`, en orden)
+Muchas auditorías empresariales se hacen hoy en hojas de cálculo dispersas, sin trazabilidad hasta la respuesta original y sin poder mostrar resultados hasta que todo el proceso termina. Este proyecto modela la auditoría como una estructura jerárquica completa y permite generar resultados e informes **a medida que avanza la evaluación**, sin esperar a que esté 100% completa.
 
-## Variables de entorno
+## Estructura del modelo
 
-Ninguna credencial vive en `application.yml` ni en el código. Copiar `.env.example` a `.env` y completar (ver ese archivo para el detalle de cada variable):
+```
+Empresa
+ └─ Auditoría
+     └─ Categoría
+         └─ Subcategoría
+             └─ Cuestionario
+                 └─ Dimensión / Bloque
+                     └─ Pregunta
+                         └─ Respuesta
+```
 
-| Variable | Descripción |
+Una auditoría puede evaluar una sola categoría, varias, o el alcance completo — el sistema no obliga a evaluarlo todo para producir resultados.
+
+## Funcionalidades principales
+
+- **Evaluación flexible por alcance**: auditorías parciales o completas, por categoría, subcategoría o cuestionario específico.
+- **Informes progresivos**: un informe puede generarse con lo evaluado hasta el momento (marcado como *preliminar*) y evoluciona automáticamente a *final* cuando se completa su alcance — sin crear un mecanismo de reporte distinto.
+- **Consolidación multinivel**: resultados por dimensión, subcategoría, categoría y consolidado general, todos calculados con la misma lógica (dashboard y PDF comparten una única fuente de resultados).
+- **"No evaluado" ≠ "cero"**: los elementos fuera de alcance nunca se cuentan como puntaje mínimo, para no distorsionar los resultados.
+- **Dashboard ejecutivo**: puntaje global, subcategorías críticas, semáforos de criticidad (escala de madurez 1–5) y navegación tipo *drill-down* hasta la respuesta y evidencia original.
+- **Informes en PDF**: informe de subcategoría, de categoría, consolidado multicategoría e integral, con resumen ejecutivo, hallazgos, recomendaciones y plan de acción priorizado — no es la simple unión de PDFs individuales.
+- **Trazabilidad completa**: todo resultado puede rastrearse hasta las respuestas que lo originaron.
+
+## Stack técnico
+
+| Capa | Tecnología |
 |---|---|
-| `SPRING_PROFILES_ACTIVE` | `dev`, `test` o `prod` |
-| `SPRING_DATASOURCE_URL` | JDBC de Supabase, con `sslmode=require` obligatorio |
-| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | Credenciales de la base de datos |
-| `DB_POOL_MAX_SIZE` / `DB_POOL_MIN_IDLE` | Tamaño del pool HikariCP — ajustar al límite de conexiones del plan de Supabase |
-| `JWT_SECRET` | Secreto HS256, mínimo 32 caracteres |
-| `JWT_ACCESS_TOKEN_MINUTES` / `JWT_REFRESH_TOKEN_DAYS` | Duración de los tokens |
-| `CORS_ALLOWED_ORIGINS` | Origen del frontend (`http://localhost:5173` en dev) |
-| `SUPABASE_STORAGE_URL` | Base de la REST API de Supabase Storage (`.../storage/v1`) |
-| `SUPABASE_SERVICE_KEY` | Service role key de Supabase (nunca la anon key) |
-| `SUPABASE_BUCKET_REPORTES` / `SUPABASE_BUCKET_EVIDENCIA` | Buckets de Storage para PDFs y fotos |
+| Frontend | React, Vite, JavaScript, HTML, CSS |
+| Backend | Java, Spring Boot, Maven |
+| Base de datos | PostgreSQL (vía Supabase) |
+| Contenedores | Docker, Docker Compose |
 
-Si se despliega más de una instancia del backend en paralelo, usar el endpoint del connection pooler de Supabase (Supavisor) en `SPRING_DATASOURCE_URL` en vez de la conexión directa.
+## Estado del proyecto
 
-## Ejecutar en local
+En desarrollo activo. La categoría **Mantenimiento** (con subcategorías como Almacén de Repuestos, Cultura de Mantenimiento, Estrategia, Habilidades del Personal, Mediciones y Órdenes de Trabajo) se usa como primera implementación y validación del modelo antes de escalar a categorías adicionales (por ejemplo, Energía o Sostenibilidad).
+
+## Instalación y ejecución
+
+### Opción 1 — Manual
 
 ```bash
+# Backend (Maven)
+cd BACKEND/bakend
+cp .env.example .env   # completar variables de entorno (conexión a Supabase, etc.)
 ./mvnw spring-boot:run
+# Disponible en http://localhost:8080, conectado a Supabase
+
+# Frontend (Vite)
+cd FRONTEND
+npm install
+npm run dev
+# Disponible en http://localhost:5173
 ```
 
-Swagger UI: `http://localhost:8080/swagger-ui.html` (deshabilitado en el perfil `prod`).
-
-## Docker
-
-Solo el backend se conteneriza — la base de datos es Supabase, externa y gestionada.
+### Opción 2 — Docker
 
 ```bash
-cp .env.example .env   # completar con los valores reales
-docker compose up --build
+docker-compose up
 ```
 
-## Pruebas
+### Acceso a la aplicación (entorno de desarrollo local)
 
-Las pruebas de integración (`src/test`) levantan un Postgres real con Testcontainers y le aplican las migraciones reales del proyecto antes de correr, para validar contra el esquema real (triggers, checks, índices) en vez de un esquema autogenerado. Requieren Docker corriendo:
+Un usuario de prueba viene sembrado en la base de datos para poder iniciar sesión de inmediato en `http://localhost:5173`:
 
-```bash
-./mvnw test
-```
+- **Usuario:** `auditor@prueba.com`
+- **Contraseña:** `clave1234`
 
-## Primer usuario
+Documentado en `BACKEND/bakend/local-dev/README.md`.
 
-No hay registro público. El primer usuario (rol `admin`) se crea con un INSERT directo en Supabase con una contraseña ya hasheada en BCrypt; a partir de ahí, `POST /api/usuarios` (solo `ADMIN`) da de alta al resto.
+> Estas credenciales son exclusivamente para desarrollo local y no corresponden a ningún entorno de producción.
+
+## Autor
+
+**Rodrigo Berrío Ramírez** — [github.com/RodrigoBerrio](https://github.com/RodrigoBerrio)
+Proyecto desarrollado como parte de su transición de carrera hacia tecnología, con apoyo de herramientas de inteligencia artificial a lo largo del ciclo de desarrollo.
